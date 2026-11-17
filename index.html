@@ -436,12 +436,25 @@ function wing(cx,cz,len,dep,rot,lift,floors,coreEnd){
     LOBBY.quad(Wp(l0-1,y0+1.5,d),Wp(l0+1,y0+1.5,d),Wp(l0+1,y0+h+1,d),Wp(l0-1,y0+h+1,d),GLASS,su); }
   const le=-coreEnd*(len/2+.06);
   LOBBY.quad(Wp(le,y0+1.5,-1),Wp(le,y0+1.5,1),Wp(le,y0+h-1,1),Wp(le,y0+h-1,-1),GLASS,su);
+  return y0;
 }
 const HP = Math.PI/2;
-wing(-110,-72,60,16,HP,.15,5,-1);          // 앞줄 1동 (본관 바로 북쪽)
-wing(-101,-150,64,16,HP-.12,.3,5,1);       // 앞줄 2동
-wing(-158,-58,60,16,HP+.08,5,5,-1);        // 뒷줄 1동 (언덕 위)
-wing(-150,-134,64,16,HP-.06,5,5,1);        // 뒷줄 2동
+// 두 점을 잇는 연결동: 유리 복도가 있는 낮은 몸체
+function link(ax,az,bx,bz,dep,y0,h){
+  const dx=bx-ax, dz=bz-az, L=Math.hypot(dx,dz)+3, rot=Math.atan2(-dz,dx), cx=(ax+bx)/2, cz=(az+bz)/2, cs=Math.cos(rot), sn=Math.sin(rot);
+  const Wp=(l,y,d)=>[cx+l*cs+d*sn, y, cz-l*sn+d*cs];
+  BLD.push([cx,cz,L+4,dep+2,rot]);
+  P.box(cx,y0-9,cz,L,h+9,dep,CORE,rot); P.box(cx,y0+h,cz,L+.8,.5,dep+1.4,ROOFC,rot);
+  for(let f=0;f*3.6+3<h;f++) for(const sd of [-1,1]){ const d=sd*(dep/2+.06), a=y0+f*3.6+1, b=a+2;
+    LOBBY.quad(Wp(-L/2+1,a,d),Wp(L/2-1,a,d),Wp(L/2-1,b,d),Wp(-L/2+1,b,d),GLASS,[[0,.2],[L/5,.2],[L/5,.8],[0,.8]]); }
+}
+const yF1 = wing(-110,-72,60,16,HP,.15,5,-1);          // 앞줄 1동 (본관 바로 북쪽)
+wing(-101,-150,64,16,HP-.12,.3,5,1);                   // 앞줄 2동
+const yB1 = wing(-158,-58,60,16,HP+.08,5,5,-1);        // 뒷줄 1동 (언덕 위)
+const yB2 = wing(-150,-134,64,16,HP-.06,5,5,1);        // 뒷줄 2동
+link(-110,-102,-104.8,-118,13,yF1,18);                 // 앞줄 두 동을 잇는다
+link(-160.4,-88,-151.9,-102,13,Math.min(yB1,yB2),18+Math.abs(yB1-yB2));   // 뒷줄 두 동을 잇는다
+link(-112,-110,-152,-96,9,yF1,Math.max(10.8,Math.min(yB1,yB2)-yF1+7.2));  // 앞줄과 뒷줄을 잇는다
 wing(-152,-200,20,14,HP,3,4,1);            // 북쪽 작은 동
 wing(-152,104,56,16,HP+.15,4,5,1);         // 남쪽 ㄱ자 동
 wing(-122,142,52,16,.2,4,5,-1);
