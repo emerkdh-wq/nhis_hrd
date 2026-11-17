@@ -415,27 +415,29 @@ MAINLOBBY.quad([-93.95,.4,46],[-93.95,.4,-26],[-93.95,7.2,-26],[-93.95,7.2,46],[
 const BLD = [];
 const inBld = (x,z) => BLD.some(b => { const dx=x-b[0], dz=z-b[1], cs=Math.cos(b[4]), sn=Math.sin(b[4]); return Math.abs(dx*cs-dz*sn)<b[2]/2+3 && Math.abs(dx*sn+dz*cs)<b[3]/2+3; });
 const WALL=[.88,.85,.77], SLAB=[.93,.91,.86], ROOFC=[.3,.31,.33], CORE=[.8,.8,.78], GLASS=[.24,.3,.36];
+const NF_P=new Mesh(), NF_D=new Mesh(), NF_L=new Mesh(), SF_P=new Mesh(), SF_D=new Mesh(), SF_L=new Mesh();
+let TP=P, TD=DORM, TL=LOBBY;
 function wing(cx,cz,len,dep,rot,lift,floors,coreEnd){
   const cs=Math.cos(rot), sn=Math.sin(rot), h=floors*3.6;
   const Wp=(l,y,d)=>[cx+l*cs+d*sn, y, cz-l*sn+d*cs];
   let g=-1e9; for(const k of [[0,0],[-1,-1],[1,-1],[1,1],[-1,1]]){ const q=Wp(k[0]*len/2,0,k[1]*dep/2); g=Math.max(g,H(q[0],q[2])); }
   const y0=g+lift, su=[[.1,.1],[.4,.1],[.4,.9],[.1,.9]];
   BLD.push([cx,cz,len+11,dep+2,rot]);
-  P.box(cx,y0-9,cz,len+.6,9.1,dep+.6,[.6,.6,.58],rot);
+  TP.box(cx,y0-9,cz,len+.6,9.1,dep+.6,[.6,.6,.58],rot);
   for(const sd of [-1,1]){ const d=sd*dep/2, l=sd*len/2;
-    DORM.quad(Wp(-len/2,y0,d),Wp(len/2,y0,d),Wp(len/2,y0+h,d),Wp(-len/2,y0+h,d),WHITE,[[0,0],[len/16,0],[len/16,floors/4],[0,floors/4]]);
-    P.quad(Wp(l,y0,-dep/2),Wp(l,y0,dep/2),Wp(l,y0+h,dep/2),Wp(l,y0+h,-dep/2),WALL);
+    TD.quad(Wp(-len/2,y0,d),Wp(len/2,y0,d),Wp(len/2,y0+h,d),Wp(-len/2,y0+h,d),WHITE,[[0,0],[len/16,0],[len/16,floors/4],[0,floors/4]]);
+    TP.quad(Wp(l,y0,-dep/2),Wp(l,y0,dep/2),Wp(l,y0+h,dep/2),Wp(l,y0+h,-dep/2),WALL);
   }
-  for(let f=1;f<floors;f++) P.box(cx,y0+f*3.6-.16,cz,len+.3,.32,dep+1.3,SLAB,rot);
-  P.box(cx,y0+h,cz,len+1.8,.55,dep+2.2,ROOFC,rot);
-  const b1=Wp(-coreEnd*len*.2,0,0); P.box(b1[0],y0+h+.55,b1[2],7,2.6,5,CORE,rot);
-  for(const t of [.1,.28]){ const a=Wp(coreEnd*len*t,0,1.5); P.box(a[0],y0+h+.55,a[2],2.4,1.2,1.6,[.7,.71,.72],rot); }
+  for(let f=1;f<floors;f++) TP.box(cx,y0+f*3.6-.16,cz,len+.3,.32,dep+1.3,SLAB,rot);
+  TP.box(cx,y0+h,cz,len+1.8,.55,dep+2.2,ROOFC,rot);
+  const b1=Wp(-coreEnd*len*.2,0,0); TP.box(b1[0],y0+h+.55,b1[2],7,2.6,5,CORE,rot);
+  for(const t of [.1,.28]){ const a=Wp(coreEnd*len*t,0,1.5); TP.box(a[0],y0+h+.55,a[2],2.4,1.2,1.6,[.7,.71,.72],rot); }
   const l0=coreEnd*(len/2+2.6), c=Wp(l0,0,0);
-  P.box(c[0],y0-9,c[2],5.2,h+11.6,dep+1.6,CORE,rot); P.box(c[0],y0+h+2.6,c[2],6,.4,dep+2.4,ROOFC,rot);
+  TP.box(c[0],y0-9,c[2],5.2,h+11.6,dep+1.6,CORE,rot); TP.box(c[0],y0+h+2.6,c[2],6,.4,dep+2.4,ROOFC,rot);
   for(const sd of [-1,1]){ const d=sd*(dep/2+.86);
-    LOBBY.quad(Wp(l0-1,y0+1.5,d),Wp(l0+1,y0+1.5,d),Wp(l0+1,y0+h+1,d),Wp(l0-1,y0+h+1,d),GLASS,su); }
+    TL.quad(Wp(l0-1,y0+1.5,d),Wp(l0+1,y0+1.5,d),Wp(l0+1,y0+h+1,d),Wp(l0-1,y0+h+1,d),GLASS,su); }
   const le=-coreEnd*(len/2+.06);
-  LOBBY.quad(Wp(le,y0+1.5,-1),Wp(le,y0+1.5,1),Wp(le,y0+h-1,1),Wp(le,y0+h-1,-1),GLASS,su);
+  TL.quad(Wp(le,y0+1.5,-1),Wp(le,y0+1.5,1),Wp(le,y0+h-1,1),Wp(le,y0+h-1,-1),GLASS,su);
   return y0;
 }
 const HP = Math.PI/2;
@@ -444,10 +446,11 @@ function link(ax,az,bx,bz,dep,y0,h){
   const dx=bx-ax, dz=bz-az, L=Math.hypot(dx,dz)+3, rot=Math.atan2(-dz,dx), cx=(ax+bx)/2, cz=(az+bz)/2, cs=Math.cos(rot), sn=Math.sin(rot);
   const Wp=(l,y,d)=>[cx+l*cs+d*sn, y, cz-l*sn+d*cs];
   BLD.push([cx,cz,L+4,dep+2,rot]);
-  P.box(cx,y0-9,cz,L,h+9,dep,CORE,rot); P.box(cx,y0+h,cz,L+.8,.5,dep+1.4,ROOFC,rot);
+  TP.box(cx,y0-9,cz,L,h+9,dep,CORE,rot); TP.box(cx,y0+h,cz,L+.8,.5,dep+1.4,ROOFC,rot);
   for(let f=0;f*3.6+3<h;f++) for(const sd of [-1,1]){ const d=sd*(dep/2+.06), a=y0+f*3.6+1, b=a+2;
-    LOBBY.quad(Wp(-L/2+1,a,d),Wp(L/2-1,a,d),Wp(L/2-1,b,d),Wp(-L/2+1,b,d),GLASS,[[0,.2],[L/5,.2],[L/5,.8],[0,.8]]); }
+    TL.quad(Wp(-L/2+1,a,d),Wp(L/2-1,a,d),Wp(L/2-1,b,d),Wp(-L/2+1,b,d),GLASS,[[0,.2],[L/5,.2],[L/5,.8],[0,.8]]); }
 }
+TP=NF_P; TD=NF_D; TL=NF_L;
 const yF1 = wing(-110,-72,60,16,HP,.15,5,-1);          // 앞줄 1동 (본관 바로 북쪽)
 wing(-101,-150,64,16,HP-.12,.3,5,1);                   // 앞줄 2동
 const yB1 = wing(-158,-58,60,16,HP+.08,5,5,-1);        // 뒷줄 1동 (언덕 위)
@@ -455,9 +458,14 @@ const yB2 = wing(-150,-134,64,16,HP-.06,5,5,1);        // 뒷줄 2동
 link(-110,-102,-104.8,-118,13,yF1,18);                 // 앞줄 두 동을 잇는다
 link(-160.4,-88,-151.9,-102,13,Math.min(yB1,yB2),18+Math.abs(yB1-yB2));   // 뒷줄 두 동을 잇는다
 link(-112,-110,-152,-96,9,yF1,Math.max(10.8,Math.min(yB1,yB2)-yF1+7.2));  // 앞줄과 뒷줄을 잇는다
+TP=P; TD=DORM; TL=LOBBY;
 wing(-152,-200,20,14,HP,3,4,1);            // 북쪽 작은 동
+TP=SF_P; TD=SF_D; TL=SF_L;
 wing(-152,104,56,16,HP+.15,4,5,1);         // 남쪽 ㄱ자 동
 wing(-122,142,52,16,.2,4,5,-1);
+TP=P; TD=DORM; TL=LOBBY;
+BLD.push([-152,-110,116,150,0],[-135,110,66,70,0]);
+P.box(-135,-3,110,62,6,68,mul3(PAL.lawn,.9));   // 남쪽 동이 앉은 둔덕
 P.box(-108,0,-33,10,8,8,CORE); P.box(-108,8,-33,11,.4,9,ROOFC);   // 본관과 생활관을 잇는 통로
 { const gx=-66, gz=-205, gy=Math.max(H(gx,gz),H(gx+18,gz+14),H(gx-18,gz-14))+.2; BLD.push([gx,gz,46,38,0]);   // 체육관
   P.box(gx,gy-8,gz,38,15,30,[.86,.86,.84]); P.box(gx,gy+7,gz,39,5.5,31,[.33,.34,.37]); P.box(gx,gy+12.5,gz,41,.6,33,[.24,.25,.27]);
@@ -729,7 +737,7 @@ const FLAT = prog(
 /* ───────── 버퍼 ───────── */
 function vbo(data,dyn){ const b=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,b); gl.bufferData(gl.ARRAY_BUFFER,data,dyn?gl.DYNAMIC_DRAW:gl.STATIC_DRAW); return b; }
 const mk = m => ({b:vbo(new Float32Array(m.a)), n:m.a.length/11});
-const B = {props:mk(P), field:mk(FIELD), court:mk(COURT), tennis:mk(TENNIS), facade:mk(FACADE), dorm:mk(DORM), fence:mk(FENCE), net:mk(NET), lobby:mk(LOBBY), sock:mk(SOCK), main:mk(MAIN), mainLobby:mk(MAINLOBBY)};
+const B = {props:mk(P), field:mk(FIELD), court:mk(COURT), tennis:mk(TENNIS), facade:mk(FACADE), dorm:mk(DORM), fence:mk(FENCE), net:mk(NET), lobby:mk(LOBBY), sock:mk(SOCK), main:mk(MAIN), mainLobby:mk(MAINLOBBY), nf:[mk(NF_P),mk(NF_D),mk(NF_L)], sf:[mk(SF_P),mk(SF_D),mk(SF_L)]};
 const terrB = vbo(terr.a), terrI = gl.createBuffer();
 gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,terrI); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,terr.idx,gl.STATIC_DRAW);
 const gondB = vbo(new Float32Array(10*30*11),true);
@@ -745,12 +753,10 @@ for(let i=0;i<NP;i++){ part[i*3]=rr(-16,16); part[i*3+1]=rr(0,14); part[i*3+2]=r
 /* ───────── 본관 3D 모델 (bonkwan.glb) ─────────
    모델은 정면이 +z, 가로 1.9 × 깊이 1.8 × 높이 1.09. 정면이 운동장(+x)을 보도록 돌리고
    실제 본관 크기(정면 79m, 깊이 39m, 높이 30m)에 맞게 늘린다. */
-const BK = {cx:-110.5, cz:10, sFront:41.6, sDepth:21.7, sUp:28.2, y0:-.53};
-async function loadBonkwan(){
-  let buf;
-  const embedded = document.getElementById('bkdata');
-  if (embedded){ const bs = atob(embedded.textContent.trim()), u = new Uint8Array(bs.length); for (let i=0;i<bs.length;i++) u[i] = bs.charCodeAt(i); buf = u.buffer; }
-  else { const res = await fetch('bonkwan.glb'); if (!res.ok) throw new Error('HTTP '+res.status); buf = await res.arrayBuffer(); }
+async function loadModel(file, elId, pos, nor, glass){
+  let buf; const emb = document.getElementById(elId);
+  if (emb){ const bs = atob(emb.textContent.trim()), u = new Uint8Array(bs.length); for (let i=0;i<bs.length;i++) u[i] = bs.charCodeAt(i); buf = u.buffer; }
+  else { const res = await fetch(file); if (!res.ok) throw new Error('HTTP '+res.status); buf = await res.arrayBuffer(); }
   const dv = new DataView(buf);
   const jl = dv.getUint32(12,true), js = JSON.parse(new TextDecoder().decode(new Uint8Array(buf,20,jl)));
   const bo = 20+jl+8, bin = buf.slice(bo, bo+dv.getUint32(20+jl,true));
@@ -759,27 +765,36 @@ async function loadBonkwan(){
   const pr = js.meshes[0].primitives[0], Pp = acc(pr.attributes.POSITION), Nn = acc(pr.attributes.NORMAL), Uu = acc(pr.attributes.TEXCOORD_0), I = acc(pr.indices);
   const out = new Float32Array(I.length*11);
   for (let k=0;k<I.length;k++){
-    const v = I[k], o = k*11, mx = Pp[v*3], my = Pp[v*3+1], mz = Pp[v*3+2];
-    out[o] = BK.cx + mz*BK.sDepth; out[o+1] = (my-BK.y0)*BK.sUp; out[o+2] = BK.cz - mx*BK.sFront;
-    let nx = Nn[v*3+2]/BK.sDepth, ny = Nn[v*3+1]/BK.sUp, nz = -Nn[v*3]/BK.sFront; const l = Math.hypot(nx,ny,nz)||1;
-    out[o+3] = nx/l; out[o+4] = ny/l; out[o+5] = nz/l; out[o+6] = out[o+7] = out[o+8] = 1; out[o+9] = Uu[v*2]; out[o+10] = Uu[v*2+1];
+    const v = I[k], o = k*11, w = pos(Pp[v*3],Pp[v*3+1],Pp[v*3+2]), n = nor(Nn[v*3],Nn[v*3+1],Nn[v*3+2]), l = Math.hypot(n[0],n[1],n[2])||1;
+    out[o] = w[0]; out[o+1] = w[1]; out[o+2] = w[2]; out[o+3] = n[0]/l; out[o+4] = n[1]/l; out[o+5] = n[2]/l;
+    out[o+6] = out[o+7] = out[o+8] = 1; out[o+9] = Uu[v*2]; out[o+10] = Uu[v*2+1];
   }
   const im = js.images[0], iv = js.bufferViews[im.bufferView];
   const url = URL.createObjectURL(new Blob([new Uint8Array(bin, iv.byteOffset||0, iv.byteLength)],{type:im.mimeType}));
   const img = new Image(); img.src = url; await img.decode(); URL.revokeObjectURL(url);
-  // 밤 불빛: 유리(푸른 부분)만 골라 따뜻한 빛을 띄운다. 칸마다 켜진 방과 꺼진 방을 섞는다.
+  // 밤 불빛: 유리 부분만 골라 따뜻한 빛을 띄운다. 칸마다 켜진 방과 꺼진 방을 섞는다.
   const S = 1024, ec = cv(S,S), ex = ec.getContext('2d'); ex.drawImage(img,0,0,S,S);
   const px = ex.getImageData(0,0,S,S), d = px.data;
   for (let y=0;y<S;y++) for (let x=0;x<S;x++){
-    const i = (y*S+x)*4, r = d[i], g = d[i+1], b = d[i+2];
-    const glass = clamp((b-r-12)/38,0,1)*clamp((b-55)/50,0,1), on = hash2(x>>3,y>>3) < .55 ? 1 : .06, k = glass*on*.62;
+    const i = (y*S+x)*4, k = glass(d[i],d[i+1],d[i+2])*(hash2(x>>3,y>>3) < .55 ? 1 : .06)*.62;
     d[i] = 255*k; d[i+1] = 205*k; d[i+2] = 140*k; d[i+3] = 255;
   }
   ex.putImageData(px,0,0);
-  T.bk = tex(img,false,true); T.bkE = tex(ec,false,true);
-  B.bonkwan = {b:vbo(out), n:I.length};
+  // WebGL1은 한 변이 2의 거듭제곱인 그림만 축소 필터를 쓸 수 있어 2048로 옮겨 그린다
+  const tc = cv(2048,2048); tc.getContext('2d').drawImage(img,0,0,2048,2048);
+  return {buf:{b:vbo(out), n:I.length}, t:tex(tc,false,true), e:tex(ec,false,true)};
 }
-loadBonkwan().catch(e => console.warn('본관 모델을 불러오지 못해 단순 모형을 씁니다:', e));
+const warnModel = name => e => console.warn(name+' 모델을 불러오지 못해 단순 모형을 씁니다:', e);
+// 본관: 정면이 +z인 모델을 운동장(+x) 쪽으로 돌리고 실제 크기(정면 79m, 깊이 39m, 높이 30m)로 늘린다
+loadModel('bonkwan.glb','bkdata', (x,y,z) => [-110.5+z*21.7, (y+.53)*28.2, 10-x*41.6], (x,y,z) => [z/21.7, y/28.2, -x/41.6],
+  (r,g,b) => clamp((b-r-12)/38,0,1)*clamp((b-55)/50,0,1)).then(m => { B.bonkwan = m.buf; T.bk = m.t; T.bkE = m.e; }).catch(warnModel('본관'));
+// 북쪽 생활관 단지: 뒷줄은 언덕을 따라 올린다
+const dormGlass = (r,g,b) => clamp((b-r-2)/8,0,1)*clamp((115-(r+g+b)/3)/30,0,1);
+loadModel('saenghwal.glb','nddata', (x,y,z) => [-152.5+z*62, (y+.151)*70+.1+(.9-z)/1.8*10, -110-x*76], (x,y,z) => [z/62, y/70, -x/76],
+  dormGlass).then(m => { B.north = m.buf; T.north = m.t; T.northE = m.e; }).catch(warnModel('생활관'));
+// 남쪽 ㄱ자 동
+loadModel('namdong.glb','sddata', (x,y,z) => [-135-z*34, (y+.2585)*34+3, 110+x*34], (x,y,z) => [-z, y, x],
+  dormGlass).then(m => { B.south = m.buf; T.south = m.t; T.southE = m.e; }).catch(warnModel('남쪽 동'));
 
 /* ───────── 행렬 ───────── */
 function persp(fovy,asp,n,f){ const t=1/Math.tan(fovy/2), o=new Float32Array(16); o[0]=t/asp; o[5]=t; o[10]=(f+n)/(n-f); o[11]=-1; o[14]=2*f*n/(n-f); return o; }
@@ -1152,6 +1167,8 @@ function frame(now){
   gl.drawElements(gl.TRIANGLES,terr.idx.length,gl.UNSIGNED_SHORT,0);
   drawLit(B.props); drawLit(B.field,T.field); drawLit(B.court,T.court); drawLit(B.tennis,T.tennis);
   if (B.bonkwan) drawLit(B.bonkwan,T.bk,T.bkE); else { drawLit(B.main); drawLit(B.facade,T.facade,T.facadeE); drawLit(B.mainLobby,null,T.lobbyE); }
+  if (B.north) drawLit(B.north,T.north,T.northE); else { drawLit(B.nf[0]); drawLit(B.nf[1],T.dorm,T.dormE); drawLit(B.nf[2],null,T.lobbyE); }
+  if (B.south) drawLit(B.south,T.south,T.southE); else { drawLit(B.sf[0]); drawLit(B.sf[1],T.dorm,T.dormE); drawLit(B.sf[2],null,T.lobbyE); }
   drawLit(B.lobby,null,T.lobbyE); drawLit(B.dorm,T.dorm,T.dormE);
   drawLit(B.sock,null,null,sockMat(SOCK_AT,windAng,.9-.75*gust+Math.sin(time*3)*.05));
   // 케이블카
