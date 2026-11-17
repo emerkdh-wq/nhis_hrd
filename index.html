@@ -709,8 +709,11 @@ for(let i=0;i<NP;i++){ part[i*3]=rr(-16,16); part[i*3+1]=rr(0,14); part[i*3+2]=r
    실제 본관 크기(정면 79m, 깊이 39m, 높이 30m)에 맞게 늘린다. */
 const BK = {cx:-110.5, cz:10, sFront:41.6, sDepth:21.7, sUp:28.2, y0:-.53};
 async function loadBonkwan(){
-  const res = await fetch('bonkwan.glb'); if (!res.ok) throw new Error('HTTP '+res.status);
-  const buf = await res.arrayBuffer(), dv = new DataView(buf);
+  let buf;
+  const embedded = document.getElementById('bkdata');
+  if (embedded){ const bs = atob(embedded.textContent.trim()), u = new Uint8Array(bs.length); for (let i=0;i<bs.length;i++) u[i] = bs.charCodeAt(i); buf = u.buffer; }
+  else { const res = await fetch('bonkwan.glb'); if (!res.ok) throw new Error('HTTP '+res.status); buf = await res.arrayBuffer(); }
+  const dv = new DataView(buf);
   const jl = dv.getUint32(12,true), js = JSON.parse(new TextDecoder().decode(new Uint8Array(buf,20,jl)));
   const bo = 20+jl+8, bin = buf.slice(bo, bo+dv.getUint32(20+jl,true));
   const acc = i => { const a = js.accessors[i], v = js.bufferViews[a.bufferView], n = {SCALAR:1,VEC2:2,VEC3:3}[a.type], off = (v.byteOffset||0)+(a.byteOffset||0);
