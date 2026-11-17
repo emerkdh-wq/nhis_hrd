@@ -305,7 +305,7 @@ const C = {
 };
 const P = new Mesh();      // 색만 입힌 구조물
 const FIELD = new Mesh(), COURT = new Mesh(), TENNIS = new Mesh(), FACADE = new Mesh(), DORM = new Mesh();
-const FENCE = new Mesh(), NET = new Mesh(), LOBBY = new Mesh();
+const FENCE = new Mesh(), NET = new Mesh(), LOBBY = new Mesh(), MAIN = new Mesh(), MAINLOBBY = new Mesh();
 const WHITE = [1,1,1];
 const glows = [], farGlows = [], cableLines = [];
 
@@ -406,13 +406,13 @@ for(const tx of [64,80]) for(const tz of [0,24]) TLAMPS.push([tx,7.5,tz]);
 for(const bz of [-36,-20,22,40]) P.box(43.6,H(43.6,bz),bz,.5,.45,1.8,C.wood);
 
 /* 본관 */
-P.box(-111,0,10,34,7.6,72,C.glassDark);
-for(let i=0;i<9;i++) P.box(-93.6,0,-24+i*8.5,.5,7.6,.5,C.conc);
-P.box(-110,8.3,10,36,17.2,75,[.17,.2,.25]);
-P.box(-108.5,25.5,10,39,4.6,79,C.bronze); P.box(-108.5,7.6,10,39,.8,79,[.55,.55,.56]);
-P.box(-108.5,7.6,-28.3,39,18,1.6,C.bronze); P.box(-108.5,7.6,48.3,39,18,1.6,C.bronze);
+MAIN.box(-111,0,10,34,7.6,72,C.glassDark);
+for(let i=0;i<9;i++) MAIN.box(-93.6,0,-24+i*8.5,.5,7.6,.5,C.conc);
+MAIN.box(-110,8.3,10,36,17.2,75,[.17,.2,.25]);
+MAIN.box(-108.5,25.5,10,39,4.6,79,C.bronze); MAIN.box(-108.5,7.6,10,39,.8,79,[.55,.55,.56]);
+MAIN.box(-108.5,7.6,-28.3,39,18,1.6,C.bronze); MAIN.box(-108.5,7.6,48.3,39,18,1.6,C.bronze);
 FACADE.quad([-91.9,8.4,47.5],[-91.9,8.4,-27.5],[-91.9,25.5,-27.5],[-91.9,25.5,47.5],WHITE);
-LOBBY.quad([-93.95,.4,46],[-93.95,.4,-26],[-93.95,7.2,-26],[-93.95,7.2,46],[.2,.26,.32],[[0,0],[9,0],[9,1],[0,1]]);
+MAINLOBBY.quad([-93.95,.4,46],[-93.95,.4,-26],[-93.95,7.2,-26],[-93.95,7.2,46],[.2,.26,.32],[[0,0],[9,0],[9,1],[0,1]]);
 P.box(-111,0,61,28,22,23,[.7,.71,.7]);
 for(const by of [3.6,8.2,12.8,17.4]){ P.box(-96.8,by,61,.5,1.7,23.4,[.22,.25,.28]);
   LOBBY.quad([-96.5,by+.1,72],[-96.5,by+.1,50],[-96.5,by+1.6,50],[-96.5,by+1.6,72],[.22,.25,.28],[[0,.2],[3,.2],[3,.8],[0,.8]]); }
@@ -536,9 +536,9 @@ const terr = (() => {
 /* ───────── 텍스처 ───────── */
 function cv(w,h){ const c=document.createElement('canvas'); c.width=w; c.height=h; return c; }
 const aniso = gl.getExtension('EXT_texture_filter_anisotropic');
-function tex(c,repeat){
+function tex(c,repeat,noFlip){
   const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,t);
-  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,!noFlip);
   gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,c);
   gl.generateMipmap(gl.TEXTURE_2D);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);
@@ -691,7 +691,7 @@ const FLAT = prog(
 /* ───────── 버퍼 ───────── */
 function vbo(data,dyn){ const b=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,b); gl.bufferData(gl.ARRAY_BUFFER,data,dyn?gl.DYNAMIC_DRAW:gl.STATIC_DRAW); return b; }
 const mk = m => ({b:vbo(new Float32Array(m.a)), n:m.a.length/11});
-const B = {props:mk(P), field:mk(FIELD), court:mk(COURT), tennis:mk(TENNIS), facade:mk(FACADE), dorm:mk(DORM), fence:mk(FENCE), net:mk(NET), lobby:mk(LOBBY), sock:mk(SOCK)};
+const B = {props:mk(P), field:mk(FIELD), court:mk(COURT), tennis:mk(TENNIS), facade:mk(FACADE), dorm:mk(DORM), fence:mk(FENCE), net:mk(NET), lobby:mk(LOBBY), sock:mk(SOCK), main:mk(MAIN), mainLobby:mk(MAINLOBBY)};
 const terrB = vbo(terr.a), terrI = gl.createBuffer();
 gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,terrI); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,terr.idx,gl.STATIC_DRAW);
 const gondB = vbo(new Float32Array(10*30*11),true);
@@ -703,6 +703,42 @@ const gondGlowB = vbo(new Float32Array(30),true);
 const cableB = vbo(new Float32Array(cableLines));
 const NP = 520, part = new Float32Array(NP*3), partB = vbo(new Float32Array(NP*6),true), partOut = new Float32Array(NP*6);
 for(let i=0;i<NP;i++){ part[i*3]=rr(-16,16); part[i*3+1]=rr(0,14); part[i*3+2]=rr(-16,16); }
+
+/* ───────── 본관 3D 모델 (bonkwan.glb) ─────────
+   모델은 정면이 +z, 가로 1.9 × 깊이 1.8 × 높이 1.09. 정면이 운동장(+x)을 보도록 돌리고
+   실제 본관 크기(정면 79m, 깊이 39m, 높이 30m)에 맞게 늘린다. */
+const BK = {cx:-110.5, cz:10, sFront:41.6, sDepth:21.7, sUp:28.2, y0:-.53};
+async function loadBonkwan(){
+  const res = await fetch('bonkwan.glb'); if (!res.ok) throw new Error('HTTP '+res.status);
+  const buf = await res.arrayBuffer(), dv = new DataView(buf);
+  const jl = dv.getUint32(12,true), js = JSON.parse(new TextDecoder().decode(new Uint8Array(buf,20,jl)));
+  const bo = 20+jl+8, bin = buf.slice(bo, bo+dv.getUint32(20+jl,true));
+  const acc = i => { const a = js.accessors[i], v = js.bufferViews[a.bufferView], n = {SCALAR:1,VEC2:2,VEC3:3}[a.type], off = (v.byteOffset||0)+(a.byteOffset||0);
+    return a.componentType===5126 ? new Float32Array(bin,off,a.count*n) : a.componentType===5125 ? new Uint32Array(bin,off,a.count) : new Uint16Array(bin,off,a.count); };
+  const pr = js.meshes[0].primitives[0], Pp = acc(pr.attributes.POSITION), Nn = acc(pr.attributes.NORMAL), Uu = acc(pr.attributes.TEXCOORD_0), I = acc(pr.indices);
+  const out = new Float32Array(I.length*11);
+  for (let k=0;k<I.length;k++){
+    const v = I[k], o = k*11, mx = Pp[v*3], my = Pp[v*3+1], mz = Pp[v*3+2];
+    out[o] = BK.cx + mz*BK.sDepth; out[o+1] = (my-BK.y0)*BK.sUp; out[o+2] = BK.cz - mx*BK.sFront;
+    let nx = Nn[v*3+2]/BK.sDepth, ny = Nn[v*3+1]/BK.sUp, nz = -Nn[v*3]/BK.sFront; const l = Math.hypot(nx,ny,nz)||1;
+    out[o+3] = nx/l; out[o+4] = ny/l; out[o+5] = nz/l; out[o+6] = out[o+7] = out[o+8] = 1; out[o+9] = Uu[v*2]; out[o+10] = Uu[v*2+1];
+  }
+  const im = js.images[0], iv = js.bufferViews[im.bufferView];
+  const url = URL.createObjectURL(new Blob([new Uint8Array(bin, iv.byteOffset||0, iv.byteLength)],{type:im.mimeType}));
+  const img = new Image(); img.src = url; await img.decode(); URL.revokeObjectURL(url);
+  // 밤 불빛: 유리(푸른 부분)만 골라 따뜻한 빛을 띄운다. 칸마다 켜진 방과 꺼진 방을 섞는다.
+  const S = 1024, ec = cv(S,S), ex = ec.getContext('2d'); ex.drawImage(img,0,0,S,S);
+  const px = ex.getImageData(0,0,S,S), d = px.data;
+  for (let y=0;y<S;y++) for (let x=0;x<S;x++){
+    const i = (y*S+x)*4, r = d[i], g = d[i+1], b = d[i+2];
+    const glass = clamp((b-r-12)/38,0,1)*clamp((b-55)/50,0,1), on = hash2(x>>3,y>>3) < .55 ? 1 : .06, k = glass*on*.62;
+    d[i] = 255*k; d[i+1] = 205*k; d[i+2] = 140*k; d[i+3] = 255;
+  }
+  ex.putImageData(px,0,0);
+  T.bk = tex(img,false,true); T.bkE = tex(ec,false,true);
+  B.bonkwan = {b:vbo(out), n:I.length};
+}
+loadBonkwan().catch(e => console.warn('본관 모델을 불러오지 못해 단순 모형을 씁니다:', e));
 
 /* ───────── 행렬 ───────── */
 function persp(fovy,asp,n,f){ const t=1/Math.tan(fovy/2), o=new Float32Array(16); o[0]=t/asp; o[5]=t; o[10]=(f+n)/(n-f); o[11]=-1; o[14]=2*f*n/(n-f); return o; }
@@ -1075,7 +1111,8 @@ function frame(now){
   gl.uniformMatrix4fv(LIT.u.uM,false,IDENT); bindLit(terrB); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,terrI);
   gl.drawElements(gl.TRIANGLES,terr.idx.length,gl.UNSIGNED_SHORT,0);
   drawLit(B.props); drawLit(B.field,T.field); drawLit(B.court,T.court); drawLit(B.tennis,T.tennis);
-  drawLit(B.facade,T.facade,T.facadeE); drawLit(B.lobby,null,T.lobbyE); drawLit(B.dorm,T.dorm,T.dormE);
+  if (B.bonkwan) drawLit(B.bonkwan,T.bk,T.bkE); else { drawLit(B.main); drawLit(B.facade,T.facade,T.facadeE); drawLit(B.mainLobby,null,T.lobbyE); }
+  drawLit(B.lobby,null,T.lobbyE); drawLit(B.dorm,T.dorm,T.dormE);
   drawLit(B.sock,null,null,sockMat(SOCK_AT,windAng,.9-.75*gust+Math.sin(time*3)*.05));
   // 케이블카
   gm.a.length = 0; const gg = [];
