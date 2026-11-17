@@ -56,7 +56,8 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--jade);outline-o
 
 .sheet{position:fixed;left:12px;right:12px;bottom:12px;max-width:460px;margin:0 auto;padding:16px;border-radius:18px;
   background:rgba(14,21,23,.86);border:1px solid var(--line);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-  display:flex;flex-direction:column;gap:12px}
+  display:flex;flex-direction:column;gap:10px;max-height:calc(100% - 24px);overflow-y:auto}
+.sheet>*{flex-shrink:0}
 .sheet[hidden]{display:none}
 .sheet h2{font-family:var(--display);font-size:16px;font-weight:700}
 .sheet .row{display:flex;flex-wrap:wrap;gap:8px}
@@ -129,7 +130,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--jade);outline-o
   <div class="row" id="chips"></div>
   <label for="tslide"><span>시간 미리 보기</span><span id="tlabel">지금</span></label>
   <input type="range" id="tslide" min="0" max="24" step="0.25" value="0">
-  <p class="note">낮과 밤, 해와 달의 자리는 제천의 지금 시각을 그대로 따릅니다. 날씨는 11월 16일 제천 관측값(맑음, 13도)으로 시작하며 여기서 바꿀 수 있습니다. 계절은 날짜를 따라 바뀌며(봄 벚꽃, 여름 녹음, 가을 단풍, 겨울 눈) 여기서 미리 볼 수도 있습니다. 테니스장 조명은 저녁 7시부터 10시까지 켜집니다.</p>
+  <p class="note">낮과 밤, 해와 달의 자리는 제천의 지금 시각을 그대로 따릅니다. <span id="wxnote">날씨는 11월 17일 오후 제천 관측값(흐림, 15도)입니다.</span> 다른 날씨를 고르면 그 날씨로 바뀌고, 「실시간」을 누르면 되돌아갑니다. 계절은 날짜를 따라 바뀌며(봄 벚꽃, 여름 녹음, 가을 단풍, 겨울 눈) 여기서 미리 볼 수도 있습니다. 테니스장 조명은 저녁 7시부터 10시까지 켜집니다.</p>
   <button class="close" id="bClose" type="button">닫기</button>
 </section>
 
@@ -844,7 +845,8 @@ const WX = {
   rain:{name:'비',cover:.97,fog:.0008,rain:1,snow:0},
   snow:{name:'눈',cover:.93,fog:.0011,rain:0,snow:1}
 };
-const BAKED = {key:'clear', temp:13};
+const BAKED = {key:'cloudy', temp:15, live:false};   // 11월 17일 15:50 제천 관측값. 실시간 값을 받으면 바뀐다
+let wxManual = false;
 let wxKey = BAKED.key;
 const cur = {cover:WX[wxKey].cover, fog:WX[wxKey].fog, rain:0, snow:0, snowGround:SNOW_BASE};
 let previewH = 0;
@@ -957,11 +959,13 @@ function person(m,x,y,z,h,ph,sw,shirt,o){
     m.seg(at(0,top-.04,-.25),at(-sn*.32,.92,-.27),.06,shirt);
     if (o.racket){ const sw2 = o.racket; m.seg(at(0,top-.04,.25),at(.3+sw2*.2,1.2+sw2*.4,.4),.06,shirt);
       m.seg(at(.3+sw2*.2,1.2+sw2*.4,.4),at(.55+sw2*.3,1.5+sw2*.5,.5),.025,[.2,.2,.2]); m.blob(at(.66+sw2*.3,1.68+sw2*.5,.52)[0],y+1.68+sw2*.5,at(.66+sw2*.3,0,.52)[2],.16,.2,.16,[.9,.85,.3],3); }
+    else if (o.umb) m.seg(at(0,top-.04,.25),at(.2,top-.22,.24),.06,shirt);
     else m.seg(at(0,top-.04,.25),at(sn*.32,.92,.27),.06,shirt);
   }
   m.seg(at(0,hip-.04,0),at(0,top,0),.17,shirt);
   const hd = at(.02,top+.2,0); m.blob(hd[0],hd[1],hd[2],.14,.15,.14,SKIN,1);
   const hr = at(-.05,top+.25,0); m.blob(hr[0],hr[1],hr[2],.155,.14,.155,HAIR,2);
+  if (o.umb){ const c = at(.1,top+.6,.06); m.seg(at(.2,top-.22,.24),at(.1,top+.86,.06),.018,[.25,.25,.27]); m.cyl(c[0],c[1],c[2],.8,.03,.27,8,o.umb); }
   if (o.hat===1){ const c = at(-.03,top+.33,0), b = at(.13,top+.3,0);
     m.blob(c[0],c[1],c[2],.165,.085,.165,shirt,4); m.blob(b[0],b[1],b[2],.13,.02,.11,mul3(shirt,.8),5); }
   if (o.hat===2){ const c = at(-.02,top+.36,0), b = at(-.02,top+.3,0);
@@ -1089,15 +1093,30 @@ function hud(ms,env){
   const s = fmtClock.format(new Date(ms))+'|'+phaseName(env.alt,ms)+'|'+v[0]+'|'+wxKey+'|'+(previewH>0);
   if (s===lastHud) return; lastHud = s;
   $('clock').textContent = fmtClock.format(new Date(ms));
-  $('wxline').textContent = phaseName(env.alt,ms) + ' · ' + SEASONS[SEASON] + ' · ' + WX[wxKey].name + (wxKey===BAKED.key && previewH===0 && SEASON===autoSeason ? ' ' + BAKED.temp + '°' : '') + (previewH>0 ? ' · 미리 보기' : '');
+  $('wxline').textContent = phaseName(env.alt,ms) + ' · ' + SEASONS[SEASON] + ' · ' + WX[wxKey].name + (!wxManual && previewH===0 ? ' ' + BAKED.temp + '°' : '') + (previewH>0 ? ' · 미리 보기' : '');
   $('compass').innerHTML = '<b>'+v[0]+'</b>'+v[1];
 }
 const chips = $('chips');
 for(const k in WX){
   const b = document.createElement('button'); b.type='button'; b.className='chip'; b.textContent=WX[k].name; b.dataset.k=k;
   b.setAttribute('aria-pressed', k===wxKey); chips.appendChild(b);
-  b.onclick = () => { wxKey = k; for(const c of chips.children) c.setAttribute('aria-pressed', c.dataset.k===k); };
+  b.onclick = () => { wxManual = true; wxKey = k; syncWx(); };
 }
+{ const b = document.createElement('button'); b.type='button'; b.className='chip'; b.textContent='실시간'; b.dataset.k='live'; chips.prepend(b);
+  b.onclick = () => { wxManual = false; wxKey = BAKED.key; syncWx(); liveWeather(); }; }
+function syncWx(){ for(const c of chips.children) c.setAttribute('aria-pressed', wxManual ? c.dataset.k===wxKey : c.dataset.k==='live'); lastHud = ''; }
+// 제천 청풍면의 지금 날씨 (Open-Meteo). 접속이 막힌 곳에서는 위의 관측값을 그대로 쓴다
+function wmoKey(c){ return c<=1 ? 'clear' : c===2 ? 'partly' : (c===3||c===45||c===48) ? 'cloudy' : ((c>=71&&c<=77)||c===85||c===86) ? 'snow' : 'rain'; }
+async function liveWeather(){
+  try {
+    const r = await fetch('https://api.open-meteo.com/v1/forecast?latitude='+LAT+'&longitude='+LNG+'&current=temperature_2m,weather_code&timezone=Asia%2FSeoul');
+    if (!r.ok) return; const j = await r.json(), c = j.current; if (!c || typeof c.weather_code!=='number') return;
+    BAKED.key = wmoKey(c.weather_code); BAKED.temp = Math.round(c.temperature_2m); BAKED.live = true;
+    $('wxnote').textContent = '날씨는 제천 청풍의 실시간 관측값을 15분마다 받아 옵니다.';
+    if (!wxManual){ wxKey = BAKED.key; } syncWx();
+  } catch(e){}
+}
+syncWx(); liveWeather(); setInterval(liveWeather, 15*60*1000);
 [['','자동']].concat(Object.entries(SEASONS)).forEach(v => { const b = document.createElement('button'); b.type='button'; b.className='chip'; b.textContent=v[1];
   b.setAttribute('aria-pressed', v[0]===seasonPick);
   b.onclick = () => { try { localStorage.setItem('cp-season',v[0]); } catch(e){} location.hash = v[0]||'auto'; location.reload(); }; $('seasons').appendChild(b); });
@@ -1140,6 +1159,7 @@ function setSound(on){
 $('bSnd').onclick = () => setSound(!sndOn);
 
 /* ───────── 쉬기 ───────── */
+let umbCol = null;
 let resting = false, restT0 = 0, seated = -1, nearBench = -1, sitLabel = '', lying = false;
 function setLie(on){ if (on) standUp(); lying = on; $('bLie').setAttribute('aria-pressed', on); if (on) firstTouch(); }
 $('bLie').onclick = () => setLie(!lying);
@@ -1263,10 +1283,11 @@ function frame(now){
     gm.box(p[0]+off,p[1]-7,p[2],4.2,4.6,4.2,[.2,.32,.6],.45); gm.box(p[0]+off,p[1]-2.4,p[2],.3,2.4,.3,[.3,.3,.32]);
     gg.push(p[0]+off,p[1]-5,p[2]);
   }
-  if (third) person(gm,cam.x,gy,cam.z,cam.head,walk,sp,hex3(SHIRTS[shirtI][1]),{sit:resting,chair:seated>=0,lie:lying,hat:hatI});
+  if (cur.rain>.3){ if (!umbCol) umbCol = Math.random()<.5 ? [.98,.82,.12] : [.86,.14,.13]; } else if (cur.rain<.1) umbCol = null;
+  if (third) person(gm,cam.x,gy,cam.z,cam.head,walk,sp,hex3(SHIRTS[shirtI][1]),{sit:resting,chair:seated>=0,lie:lying,hat:hatI,umb:cur.rain>.3?umbCol:null});
   for(const a of animals) drawAnimal(gm,a);
   drawBirds(gm,time); gm.blob(ball.x,ball.y+.15,ball.z,.14,.14,.14,[.96,.96,.94],3);
-  if (tennisOn) drawTennis(gm,time);
+  if (tennisOn && cur.rain<.5) drawTennis(gm,time);
   gl.bindBuffer(gl.ARRAY_BUFFER,gondB); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(gm.a),gl.DYNAMIC_DRAW);
   drawLit({b:gondB,n:gm.a.length/11});
 
