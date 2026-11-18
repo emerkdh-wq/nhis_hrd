@@ -1078,7 +1078,8 @@ function personRaw(m,x,y,z,h,ph,sw,shirt,o){
   } else {
     m.seg(at(0,hip,-.11),at(sn*.42,.05+Math.max(0,-sn)*.12,-.11),.085,PANTS);
     m.seg(at(0,hip,.11),at(-sn*.42,.05+Math.max(0,sn)*.12,.11),.085,PANTS);
-    m.seg(at(0,top-.04,-.25),at(-sn*.32,.92,-.27),.06,shirt);
+    if (o.umb && o.torch) m.seg(at(0,top-.04,-.25),at(.2,top-.22,-.24),.06,shirt);
+    else m.seg(at(0,top-.04,-.25),at(-sn*.32,.92,-.27),.06,shirt);
     if (o.racket){ const sw2 = o.racket; m.seg(at(0,top-.04,.25),at(.3+sw2*.2,1.2+sw2*.4,.4),.06,shirt);
       m.seg(at(.3+sw2*.2,1.2+sw2*.4,.4),at(.55+sw2*.3,1.5+sw2*.5,.5),.025,[.2,.2,.2]); m.blob(at(.66+sw2*.3,1.68+sw2*.5,.52)[0],y+1.68+sw2*.5,at(.66+sw2*.3,0,.52)[2],.16,.2,.16,[.9,.85,.3],3); }
     else if (o.torch){ const hand = at(.4,1.08,.2), tip = at(.66,1.04,.21);
@@ -1090,7 +1091,7 @@ function personRaw(m,x,y,z,h,ph,sw,shirt,o){
   const hd = at(o.crouch ? .1 : .02,top+.2,0); m.blob(hd[0],hd[1],hd[2],.14,.15,.14,SKIN,1);
   const hr = at(-.05,top+.25,0); m.blob(hr[0],hr[1],hr[2],.155,.14,.155,HAIR,2);
   if (o.longHair){ const lh = at(-.1,top+.04,0); m.blob(lh[0],lh[1],lh[2],.15,.24,.17,HAIR,9); }
-  if (o.umb){ const c = at(.1,top+.6,.06); m.seg(at(.2,top-.22,.24),at(.1,top+.86,.06),.018,[.25,.25,.27]); m.cyl(c[0],c[1],c[2],.8,.03,.27,8,o.umb); }
+  if (o.umb){ const sd = o.torch ? -1 : 1, c = at(.1,top+.6,.06*sd); m.seg(at(.2,top-.22,.24*sd),at(.1,top+.86,.06*sd),.018,[.25,.25,.27]); m.cyl(c[0],c[1],c[2],.8,.03,.27,8,o.umb); }
   if (o.hat===1){ const c = at(-.03,top+.33,0), b = at(.13,top+.3,0);
     m.blob(c[0],c[1],c[2],.165,.085,.165,shirt,4); m.blob(b[0],b[1],b[2],.13,.02,.11,mul3(shirt,.8),5); }
   if (o.hat===2){ const c = at(-.02,top+.36,0), b = at(-.02,top+.3,0);
@@ -1224,7 +1225,7 @@ function drawWalkers(m,ms,torchOut){
   }
   if (sec>=23*3600){                           // 밤 순찰 산책: 손전등을 앞으로 비춘다
     const dist = (sec-23*3600)*1.1, p = loopAt(dist+LOOP.len/2);
-    person(m,p[0],.04,p[1],p[2],dist*2.6,.45,[.42,.44,.5],{longHair:true,pants:[.18,.19,.22],torch:torchOut});
+    person(m,p[0],.04,p[1],p[2],dist*2.6,.45,[.42,.44,.5],{longHair:true,pants:[.18,.19,.22],torch:torchOut,umb:cur.rain>.3?[.98,.82,.12]:null});
   }
 }
 /* ───────── 저녁 테니스 (19시~22시) ───────── */
