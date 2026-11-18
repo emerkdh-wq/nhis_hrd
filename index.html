@@ -1164,7 +1164,8 @@ function drawAnimal(m,a){
 /* ───────── 새 떼 ───────── */
 const birds = []; let nextBird = 14;
 function stepBirds(dt,time){
-  if (time>nextBird){ nextBird = time + 25 + Math.random()*45;
+  if (time>nextBird && cur.rain>.2){ nextBird = time + 5; }   // 비가 오면 새가 날지 않는다
+  else if (time>nextBird){ nextBird = time + 25 + Math.random()*45;
     const h = Math.random()*6.283, side = (Math.random()-.5)*70;
     birds.push({x:-Math.sin(h)*150+Math.cos(h)*side, z:Math.cos(h)*150+Math.sin(h)*side, y:13+Math.random()*16, h, t:0, n:3+Math.floor(Math.random()*5)});
     if (ac && sndOn) for(let i=0;i<4;i++) tone(2400+Math.random()*1400,.02,.09,i*.13+Math.random()*.05);
