@@ -130,7 +130,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--jade);outline-o
   <div class="row" id="chips"></div>
   <label for="tslide"><span>시간 미리 보기</span><span id="tlabel">지금</span></label>
   <input type="range" id="tslide" min="0" max="24" step="0.25" value="0">
-  <p class="note">낮과 밤, 해와 달의 자리는 제천의 지금 시각을 그대로 따릅니다. <span id="wxnote">날씨는 11월 17일 오후 제천 관측값(흐림, 15도)입니다.</span> 다른 날씨를 고르면 그 날씨로 바뀌고, 「실시간」을 누르면 되돌아갑니다. 계절은 날짜를 따라 바뀌며(봄 벚꽃, 여름 녹음, 가을 단풍, 겨울 눈) 여기서 미리 볼 수도 있습니다. 테니스장 조명은 저녁 7시부터 10시까지 켜집니다. 맑은 밤에는 은하수가 보입니다.</p>
+  <p class="note">낮과 밤, 해와 달의 자리는 제천의 지금 시각을 그대로 따릅니다. <span id="wxnote">날씨는 11월 18일 저녁 제천 관측값(비, 4도)입니다.</span> 다른 날씨를 고르면 그 날씨로 바뀌고, 「실시간」을 누르면 되돌아갑니다. 계절은 날짜를 따라 바뀌며(봄 벚꽃, 여름 녹음, 가을 단풍, 겨울 눈) 여기서 미리 볼 수도 있습니다. 테니스장 조명은 저녁 7시부터 10시까지 켜집니다. 맑은 밤에는 은하수가 보입니다.</p>
   <button class="close" id="bClose" type="button">닫기</button>
 </section>
 
@@ -738,7 +738,7 @@ const SKY = prog(
  'c+=uGlowCol*uGlow*(pow(az,4.)*exp(-h*5.)*.9+pow(sd,24.)*.35);'+
  'c+=uSunDisk*(smoothstep(.99985,.99995,sd)+pow(sd,900.)*.6);'+
  'if(uStars>.01){vec3 g=d*170.;vec3 id=floor(g);float hs=fract(sin(dot(id,vec3(12.9898,78.233,37.719)))*43758.5453);'+
- 'c+=vec3(.9,.95,1.)*uStars*step(.991,hs)*smoothstep(.24,.03,length(fract(g)-.5))*(.55+.45*sin(uTime*1.7+hs*90.))*smoothstep(0.,.15,d.y);vec3 mw=normalize(vec3(.62,.38,.69));float bd=dot(d,mw);vec3 t1=normalize(cross(mw,vec3(0.,1.,0.)));vec2 bp=vec2(atan(dot(d,t1),dot(d,cross(mw,t1)))*3.,bd*9.);float band=exp(-bd*bd/.028)*(.35+.9*fb(bp*1.3))*smoothstep(.62,.42,fb(bp*2.2+3.));float core=exp(-bd*bd/.006)*fb(bp*2.+9.);vec3 g2=d*420.;float h3=fract(sin(dot(floor(g2),vec3(39.3,11.1,71.7)))*43758.5453);c+=uStars*smoothstep(0.,.2,d.y)*(vec3(.5,.55,.72)*band*.24+vec3(.75,.7,.6)*core*.13+vec3(.85,.9,1.)*step(.985,h3)*band*smoothstep(.3,.05,length(fract(g2)-.5))*.8);}'+
+ 'float sz=step(.996,hs)*.12;c+=vec3(.92,.95,1.)*uStars*step(.986,hs)*smoothstep(.2+sz,.02,length(fract(g)-.5))*(1.+sz*6.)*(.6+.4*sin(uTime*1.7+hs*90.))*smoothstep(0.,.12,d.y);vec3 mw=normalize(vec3(.62,.38,.69));float bd=dot(d,mw);vec3 t1=normalize(cross(mw,vec3(0.,1.,0.)));vec2 bp=vec2(atan(dot(d,t1),dot(d,cross(mw,t1)))*3.,bd*9.);float band=exp(-bd*bd/.028)*(.35+.9*fb(bp*1.3))*smoothstep(.62,.42,fb(bp*2.2+3.));float core=exp(-bd*bd/.006)*fb(bp*2.+9.);vec3 g2=d*420.;float h3=fract(sin(dot(floor(g2),vec3(39.3,11.1,71.7)))*43758.5453);c+=uStars*smoothstep(0.,.2,d.y)*(vec3(.5,.55,.72)*band*.3+vec3(.75,.7,.6)*core*.17+vec3(.85,.9,1.)*step(.985,h3)*band*smoothstep(.3,.05,length(fract(g2)-.5))*.8);}'+
  'float md=dot(d,uMoonDir);if(md>.9997&&uMoonVis>.01){vec3 r=normalize(cross(uMoonDir,vec3(0.,1.,0.)));vec3 u=cross(r,uMoonDir);'+
  'vec2 q=vec2(dot(d,r),dot(d,u))/.0245;float qq=dot(q,q);float w=sqrt(max(1.-qq,0.));vec3 nn=normalize(q.x*r+q.y*u-w*uMoonDir);'+
  'float lit=smoothstep(-.05,.2,dot(nn,uSunDir));c=mix(c,vec3(.97,.95,.86)*(.06+lit),uMoonVis*smoothstep(1.,.85,qq));}'+
@@ -905,7 +905,7 @@ const WX = {
   rain:{name:'비',cover:.97,fog:.0008,rain:1,snow:0},
   snow:{name:'눈',cover:.93,fog:.0011,rain:0,snow:1}
 };
-const BAKED = {key:'cloudy', temp:15, live:false};   // 11월 17일 15:50 제천 관측값. 실시간 값을 받으면 바뀐다
+const BAKED = {key:'rain', temp:4, live:false};   // 11월 18일 19:20 제천 관측값. 실시간 값을 받으면 바뀐다
 let wxManual = false;
 let wxKey = BAKED.key;
 const cur = {cover:WX[wxKey].cover, fog:WX[wxKey].fog, rain:0, snow:0, snowGround:SNOW_BASE};
@@ -924,7 +924,7 @@ function envAt(ms){
   const a = KF[i], b = KF[i+1], t = clamp((alt-a[0])/(b[0]-a[0]),0,1);
   const L = k => mix3(a[k],b[k],t), o = sstep(.5,.95,cur.cover);
   let zen = L(1), hor = L(2), sun = L(3), ambS = L(4), ambG = L(5);
-  const glow = mix(a[6],b[6],t)*(1-o), stars = mix(a[7],b[7],t)*(1-cur.cover);
+  const glow = mix(a[6],b[6],t)*(1-o), stars = mix(a[7],b[7],t)*(1-sstep(.55,.9,cur.cover));
   const lum = c => c[0]*.3+c[1]*.55+c[2]*.15, gz = lum(hor)*.62, gh = lum(hor)*.8;
   zen = mix3(zen,[gz*.95,gz,gz*1.06],o*.9); hor = mix3(hor,[gh*.97,gh,gh*1.03],o*.85);
   const sunDir = dirOf(sp), moonDir = dirOf(mp);
