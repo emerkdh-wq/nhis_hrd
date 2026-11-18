@@ -840,8 +840,6 @@ loadModel('bonkwan.glb','bkdata', (x,y,z) => [-110.5+z*21.7, (y+.53)*28.2, 10-x*
     if (front && y>23.4 && y<25.2) return [.72,0,.5];         // 맨 위층 창: 노란 빛
     if (front && y>8.6 && y<=23.4) return [.03,0,.62];        // 유리벽: 루버에 비친 붉은 갈색 빛
     if (front && y>=25.2) return [0,0,.13];                  // 위쪽 금속 테두리
-    if (front && y>.3 && y<7.4) return [.46,0,0];            // 1층 로비: 은은한 노란 빛
-    if (ny<-.6 && y>5.5 && y<9.2 && x>-100) return [.34,0,0]; // 캐노피 아랫면
     if (sideGlass && y>23.4 && y<25.2) return [.4,0,0];
     return 0;
   }).then(m => { B.bonkwan = m.buf; T.bk = m.t; T.bkE = m.e; }).catch(warnModel('본관'));
@@ -1421,9 +1419,7 @@ function frame(now){
     const farA = env.night*Math.exp(-Math.pow(1500*cur.fog,2));
     gl.uniform4f(FLAT.u.uCol,1,.88,.65,farA); gl.uniform1f(FLAT.u.uSize,14*pxScale);
     gl.bindBuffer(gl.ARRAY_BUFFER,farGlowB); gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0); gl.drawArrays(gl.POINTS,0,farGlows.length);
-    if (B.bonkwan){ gl.uniform4f(FLAT.u.uCol,1,.86,.6,env.night*.55); gl.uniform1f(FLAT.u.uSize,.45*pxScale);
-      gl.bindBuffer(gl.ARRAY_BUFFER,soffitB); gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0); gl.drawArrays(gl.POINTS,0,soffit.length/3); }
-    gl.bindBuffer(gl.ARRAY_BUFFER,gondGlowB); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(gg),gl.DYNAMIC_DRAW);
+        gl.bindBuffer(gl.ARRAY_BUFFER,gondGlowB); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(gg),gl.DYNAMIC_DRAW);
     gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0); gl.uniform1f(FLAT.u.uSize,9*pxScale); gl.drawArrays(gl.POINTS,0,10);
     gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
   }
