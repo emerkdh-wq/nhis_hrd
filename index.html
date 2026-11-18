@@ -871,6 +871,7 @@ function buildCurtainGlow(out){
   const g = new Mesh(), fx = x1+.12;
   g.quad([fx,Y0,z1],[fx,Y0,z0],[fx,Y1,z0],[fx,Y1,z1],WHITE);
   B.glow = {b:vbo(new Float32Array(g.a)), n:g.a.length/11}; T.glowE = tex(c,false);
+  INSIDE = {x:fx+.16, z0:z0+1, z1:z1-1, ys:floors.map(f => Y0+f[0]+.12)};
 }
 // 북쪽 생활관 단지: 뒷줄은 언덕을 따라 올린다
 const dormGlass = (r,g,b) => clamp((b-r-2)/8,0,1)*clamp((115-(r+g+b)/3)/30,0,1);
@@ -1178,6 +1179,28 @@ function drawWalkers(m,ms,torchOut){
     person(m,p[0],.04,p[1],p[2],dist*2.6,.45,[.42,.44,.5],{longHair:true,pants:[.18,.19,.22],torch:torchOut});
   }
 }
+/* ───────── 본관 안을 오가는 사람들 (6~23시) ───────── */
+// 유리벽 바로 안쪽처럼 보이도록 창 앞에 납작하게 그린다. 밤에는 불빛을 등진 실루엣으로 보인다
+let INSIDE = null; const insiders = []; let nextInsider = 3;
+const IN_COL = [[.3,.34,.42],[.55,.5,.44],[.42,.26,.24],[.24,.3,.26],[.6,.6,.58],[.2,.22,.3]];
+function drawInsiders(m,ms,time,dt){
+  const sec = seoulSec(ms);
+  if (!INSIDE || sec<6*3600 || sec>=23*3600){ insiders.length = 0; return; }
+  if (time>nextInsider && insiders.length<6){
+    nextInsider = time + 4 + Math.random()*9;
+    const dir = Math.random()<.5 ? 1 : -1, len = 8+Math.random()*26, z = INSIDE.z0 + Math.random()*(INSIDE.z1-INSIDE.z0);
+    insiders.push({f:Math.floor(Math.random()*INSIDE.ys.length), z, end:clamp(z+dir*len,INSIDE.z0,INSIDE.z1), dir, ph:Math.random()*6,
+      col:IN_COL[Math.floor(Math.random()*IN_COL.length)], h:1.55+Math.random()*.3, hair:Math.random()<.45, sp:.9+Math.random()*.5, pause:Math.random()*3});
+  }
+  for (let i=insiders.length-1;i>=0;i--){
+    const p = insiders[i];
+    if (p.pause>0){ p.pause -= dt; } else { p.z += p.dir*p.sp*dt; p.ph += dt*p.sp*2.8; }
+    if ((p.end-p.z)*p.dir<=0){ insiders.splice(i,1); continue; }
+    const st = m.a.length, cx = INSIDE.x, y = INSIDE.ys[p.f];
+    person(m,cx,y,p.z,p.dir>0?Math.PI:0,p.ph,p.pause>0?0:.4,p.col,{height:p.h,longHair:p.hair,pants:[.18,.18,.2]});
+    for (let k=st;k<m.a.length;k+=11) m.a[k] = cx+(m.a[k]-cx)*.18;   // 앞뒤로 납작하게
+  }
+}
 /* ───────── 저녁 테니스 (19시~22시) ───────── */
 const TSHIRT = [[.9,.9,.88],[.8,.25,.2],[.2,.4,.75],[.9,.75,.2]];
 function drawTennis(m,time){
@@ -1422,7 +1445,7 @@ function frame(now){
   for(const a of animals) drawAnimal(gm,a);
   drawBirds(gm,time); gm.blob(ball.x,ball.y+.15,ball.z,.14,.14,.14,[.96,.96,.94],3);
   if (tennisOn && cur.rain<.5) drawTennis(gm,time);
-  const torch = []; drawWalkers(gm,ms,torch);
+  const torch = []; drawWalkers(gm,ms,torch); drawInsiders(gm,ms,time,dt);
   if (torch.length) lampFlat.set(torch[1],36);   // 테니스 조명이 꺼진 시간이라 그 자리를 손전등 빛으로 쓴다
   gl.bindBuffer(gl.ARRAY_BUFFER,gondB); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(gm.a),gl.DYNAMIC_DRAW);
   drawLit({b:gondB,n:gm.a.length/11});
@@ -1497,7 +1520,7 @@ function frame(now){
   }
   requestAnimationFrame(frame);
 }
-window.sansa = {deer:() => spawnAnimal('deer'), rabbit:() => spawnAnimal('rabbit'), head:() => cam.head*180/Math.PI,walker:(off) => { const sec = seoulSec(Date.now()+previewH*36e5); return sec>=23*3600 ? loopAt((sec-23*3600)*1.1+LOOP.len/2+(off||0)) : loopAt((sec-(sec>=18*3600?18:12)*3600)*.9+(off||0)); },birds:() => birds.map(b => [b.x,b.y,b.z]),lie:() => setLie(true), bird:() => { nextBird = 0; }, ball:(x,z,vx,vz) => { ball.x = x; ball.z = z; ball.vx = vx||0; ball.vz = vz||0; },animal:() => { nextAnimal = 0; }, animals:() => animals.map(a => [a.deer,Math.round(a.x),Math.round(a.z),a.wait>0]), view:t => { third = t; },preview:h => { previewH = h; }, weather:k => { wxKey = k; cur.cover = WX[k].cover; cur.fog = WX[k].fog; cur.rain = WX[k].rain; cur.snow = WX[k].snow; cur.snowGround = WX[k].snow; },
+window.sansa = {insiders:() => insiders.length,deer:() => spawnAnimal('deer'), rabbit:() => spawnAnimal('rabbit'), head:() => cam.head*180/Math.PI,walker:(off) => { const sec = seoulSec(Date.now()+previewH*36e5); return sec>=23*3600 ? loopAt((sec-23*3600)*1.1+LOOP.len/2+(off||0)) : loopAt((sec-(sec>=18*3600?18:12)*3600)*.9+(off||0)); },birds:() => birds.map(b => [b.x,b.y,b.z]),lie:() => setLie(true), bird:() => { nextBird = 0; }, ball:(x,z,vx,vz) => { ball.x = x; ball.z = z; ball.vx = vx||0; ball.vz = vz||0; },animal:() => { nextAnimal = 0; }, animals:() => animals.map(a => [a.deer,Math.round(a.x),Math.round(a.z),a.wait>0]), view:t => { third = t; },preview:h => { previewH = h; }, weather:k => { wxKey = k; cur.cover = WX[k].cover; cur.fog = WX[k].fog; cur.rain = WX[k].rain; cur.snow = WX[k].snow; cur.snowGround = WX[k].snow; },
   look:(x,z,yawDeg,pitch) => { cam.x = x; cam.z = z; cam.yaw = yawDeg*rad; cam.pitch = pitch||0; }, sun:() => sunPos(Date.now()+previewH*36e5).alt/rad};
 requestAnimationFrame(frame);
 })();
