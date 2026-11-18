@@ -424,7 +424,7 @@ function bench(x,z,hDeg){
   for(const sd of [-.78,.78]){ const bx=x+r[0]*sd, bz=z+r[1]*sd;
     P.box(bx,y,bz,.06,.42,.44,C.steel,-h); P.box(bx-f[0]*.25,y+.42,bz-f[1]*.25,.06,.62,.06,C.steel,-h); P.box(bx,y+.62,bz,.06,.05,.44,C.steel,-h); }
 }
-for(const z of [-40,-24,-8,8,24,40]) bench(41.7,z,90);        // 동쪽: 테니스장과 청풍호를 본다
+for(const z of [-40,-24,-8,8,24,40]) bench(41.9,z,270);       // 동쪽: 운동장 너머 본관을 본다
 for(const z of [-42,-22,0,22,42]) bench(-37.4,z,90);          // 서쪽: 운동장을 본다
 for(const x of [-27,-9,9,27]){ bench(x,-55.2,180); bench(x,55.2,0); }
 
