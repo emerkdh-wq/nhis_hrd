@@ -1104,8 +1104,9 @@ function loopAt(dist){
 const seoulSec = ms => (((ms/1000+32400)%86400)+86400)%86400;
 function drawWalkers(m,ms,torchOut){
   const sec = seoulSec(ms), umb = cur.rain>.3;
-  if (sec>=12*3600 && sec<13*3600){            // 점심 산책: 초속 0.9m, 나란히
-    const dist = (sec-12*3600)*.9, p = loopAt(dist), r = [Math.cos(p[2]),Math.sin(p[2])], ph = dist*2.6;
+  const coupleStart = sec>=12*3600 && sec<13*3600 ? 12*3600 : sec>=18*3600 && sec<20*3600 ? 18*3600 : -1;
+  if (coupleStart>=0){                         // 남녀 산책 (12~13시, 18~20시): 초속 0.9m, 나란히
+    const dist = (sec-coupleStart)*.9, p = loopAt(dist), r = [Math.cos(p[2]),Math.sin(p[2])], ph = dist*2.6;
     person(m,p[0]-r[0]*.36,.04,p[1]-r[1]*.36,p[2],ph*1.12,.4,[.86,.42,.38],{height:1.6,longHair:true,pants:[.82,.78,.7],umb:umb?[.98,.82,.12]:null});
     person(m,p[0]+r[0]*.38,.04,p[1]+r[1]*.38,p[2],ph+1.4,.42,[.2,.3,.45],{height:1.8,pants:[.3,.27,.24],umb:umb?[.86,.14,.13]:null});
   }
@@ -1428,7 +1429,7 @@ function frame(now){
   }
   requestAnimationFrame(frame);
 }
-window.sansa = {deer:() => spawnAnimal('deer'), rabbit:() => spawnAnimal('rabbit'), head:() => cam.head*180/Math.PI,walker:(off) => { const sec = seoulSec(Date.now()+previewH*36e5); return sec>=23*3600 ? loopAt((sec-23*3600)*1.1+LOOP.len/2+(off||0)) : loopAt((sec-12*3600)*.9+(off||0)); },birds:() => birds.map(b => [b.x,b.y,b.z]),lie:() => setLie(true), bird:() => { nextBird = 0; }, ball:(x,z,vx,vz) => { ball.x = x; ball.z = z; ball.vx = vx||0; ball.vz = vz||0; },animal:() => { nextAnimal = 0; }, animals:() => animals.map(a => [a.deer,Math.round(a.x),Math.round(a.z),a.wait>0]), view:t => { third = t; },preview:h => { previewH = h; }, weather:k => { wxKey = k; cur.cover = WX[k].cover; cur.fog = WX[k].fog; cur.rain = WX[k].rain; cur.snow = WX[k].snow; cur.snowGround = WX[k].snow; },
+window.sansa = {deer:() => spawnAnimal('deer'), rabbit:() => spawnAnimal('rabbit'), head:() => cam.head*180/Math.PI,walker:(off) => { const sec = seoulSec(Date.now()+previewH*36e5); return sec>=23*3600 ? loopAt((sec-23*3600)*1.1+LOOP.len/2+(off||0)) : loopAt((sec-(sec>=18*3600?18:12)*3600)*.9+(off||0)); },birds:() => birds.map(b => [b.x,b.y,b.z]),lie:() => setLie(true), bird:() => { nextBird = 0; }, ball:(x,z,vx,vz) => { ball.x = x; ball.z = z; ball.vx = vx||0; ball.vz = vz||0; },animal:() => { nextAnimal = 0; }, animals:() => animals.map(a => [a.deer,Math.round(a.x),Math.round(a.z),a.wait>0]), view:t => { third = t; },preview:h => { previewH = h; }, weather:k => { wxKey = k; cur.cover = WX[k].cover; cur.fog = WX[k].fog; cur.rain = WX[k].rain; cur.snow = WX[k].snow; cur.snowGround = WX[k].snow; },
   look:(x,z,yawDeg,pitch) => { cam.x = x; cam.z = z; cam.yaw = yawDeg*rad; cam.pitch = pitch||0; }, sun:() => sunPos(Date.now()+previewH*36e5).alt/rad};
 requestAnimationFrame(frame);
 })();
