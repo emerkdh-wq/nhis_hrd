@@ -391,6 +391,23 @@ for(const l of [[-70,-60],[-70,-30],[-74,20],[-70,60],[-60,84],[47,-40],[49,-20]
   P.cyl(f[0],1.2,f[1],.07,.05,9,6,[.8,.8,.8]);
   P.quad([f[0],9,f[1]],[f[0]-.5,8.9,f[1]-1.7],[f[0]-.5,10,f[1]-1.7],[f[0],10.1,f[1]],f[2]);
 });
+/* 본관 앞 큰 소나무: 붉은 갈색 줄기가 살짝 휘어 오르고, 위쪽에 넓고 납작한 솔잎 덩어리가 층층이 펼쳐진다 */
+{ const bx = -81, bz = 4.5, by = 1.2, bark = [.4,.27,.2], barkHi = [.52,.34,.24], ndl = [.14,.27,.14], ndl2 = [.18,.33,.17];
+  const trunk = [[0,0,0],[.3,3,.1],[.1,6,-.2],[-.4,9,.1],[-.2,11.5,.4],[.2,13.6,.2]];
+  const SC = 1.3, at = q => [bx+q[0]*SC, by+q[1]*SC, bz+q[2]*SC];
+  for (let i=0;i<trunk.length-1;i++) P.seg(at(trunk[i]),at(trunk[i+1]),(.55-i*.07)*SC,i<2?bark:barkHi);
+  // 가지: [줄기 높이, 방향(도), 길이, 위로 휨, 잎 덩어리 크기]
+  const br = [[6.6,200,4.6,.6,1.8],[7.4,20,4.2,.8,1.7],[8.6,110,3.6,1,1.6],[9.2,290,4,.7,1.7],[10.4,160,3.4,1,1.5],[10.9,350,3.2,1.1,1.5],[12,70,2.8,.8,1.4],[12.6,240,2.6,.9,1.3]];
+  for (const b of br){
+    const y = b[0], a = b[1]*rad, k = Math.min(trunk.length-2,Math.floor(y/2.5)), t0 = trunk[k], t1 = trunk[k+1], f = clamp((y-t0[1])/(t1[1]-t0[1]),0,1);
+    const base = [mix(t0[0],t1[0],f), y, mix(t0[2],t1[2],f)], mid = [base[0]+Math.cos(a)*b[2]*.55, y+b[3]*.3, base[2]+Math.sin(a)*b[2]*.55], tip = [base[0]+Math.cos(a)*b[2], y+b[3], base[2]+Math.sin(a)*b[2]];
+    P.seg(at(base),at(mid),.2*SC,bark); P.seg(at(mid),at(tip),.13*SC,bark);
+    const T = at(tip), M = at(mid);
+    const q = b[4]*SC*1.25; P.blob(T[0],T[1]+.4,T[2],q*1.3,q*.42,q*1.15,ndl,b[0]*3); P.blob(T[0]+.5,T[1]+.6,T[2]-.4,q*.9,q*.35,q*.8,ndl2,b[0]*7);
+    P.blob(M[0],M[1]+.5,M[2],q*.95,q*.34,q*.9,ndl2,b[0]*5);
+  }
+  const top = at(trunk[trunk.length-1]); P.blob(top[0],top[1]+.5,top[2],2.8,1,2.6,ndl2,7); P.blob(top[0]+.8,top[1]-.4,top[2]-.7,2.2,.7,2,ndl,8);
+}
 const SOCK_AT = [-42.6,7.2,39];
 P.cyl(SOCK_AT[0],1.2,SOCK_AT[2],.07,.05,6,6,[.85,.85,.85]);
 const SOCK = new Mesh();
