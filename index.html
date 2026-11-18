@@ -1419,8 +1419,7 @@ function frame(now){
   if (keys.KeyA) mx = -1; if (keys.KeyD) mx = 1;
   if (keys.ArrowLeft) cam.yaw -= dt*1.6; if (keys.ArrowRight) cam.yaw += dt*1.6;
   if (resting) mx = my = 0;
-  if (seated>=0){ if (Math.hypot(mx,my)>.35) standUp(); else mx = my = 0; }
-  if (lying){ if (Math.hypot(mx,my)>.35) setLie(false); else mx = my = 0; }
+  if (seated>=0 || lying) mx = my = 0;   // 앉거나 누운 동안은 '일어나기'를 눌러야만 움직인다
   if (riding) mx = my = 0;   // 고라니가 가는 대로 간다
   let followRun = false;
   if (follow){
@@ -1439,7 +1438,7 @@ function frame(now){
   if (seated>=0){ const b = BENCHES[seated]; cam.x = b.x+Math.sin(b.h)*.04; cam.z = b.z-Math.cos(b.h)*.04; cam.head = b.h; }
   if (riding){ cam.x = riding.x; cam.z = riding.z; cam.head = riding.h; }
   nearDeer = null; if (!riding && seated<0 && !lying){ let best = 3.2; for (const a of animals){ if (!a.deer) continue; const d = Math.hypot(a.x-cam.x,a.z-cam.z); if (d<best){ best = d; nearDeer = a; } } }
-  { const any = animals.some(a => !a.ridden && a.x<54), lab = riding || resting ? '' : follow ? '그만 따라가기' : any ? '따라가기' : '';
+  { const any = animals.some(a => !a.ridden && a.x<54), lab = riding || resting || seated>=0 || lying ? '' : follow ? '그만 따라가기' : any ? '따라가기' : '';
     if (lab!==followLabel){ followLabel = lab; $('bFollow').hidden = !lab; if (lab) $('bFollow').textContent = lab; $('bFollow').setAttribute('aria-pressed', !!follow); } }
   nearRabbit = null; if (!riding && !petting && seated<0 && !lying){ let best = 2.2; for (const a of animals){ if (a.deer) continue; const d = Math.hypot(a.x-cam.x,a.z-cam.z); if (d<best){ best = d; nearRabbit = a; } } }
   if (petting){ const a = petting.a; cam.head = Math.atan2(a.x-cam.x,-(a.z-cam.z)); }
