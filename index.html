@@ -827,7 +827,7 @@ async function loadModel(file, elId, pos, nor, glass, emit){
   ex.putImageData(px,0,0);
   // WebGL1은 한 변이 2의 거듭제곱인 그림만 축소 필터를 쓸 수 있어 2048로 옮겨 그린다
   const tc = cv(2048,2048); tc.getContext('2d').drawImage(img,0,0,2048,2048);
-  return {buf:{b:vbo(out), n:I.length}, t:tex(tc,false,true), e:tex(ec,false,true)};
+  return {buf:{b:vbo(out), n:I.length}, t:tex(tc,false,true), e:tex(ec,false,true), out};
 }
 const warnModel = name => e => console.warn(name+' 모델을 불러오지 못해 단순 모형을 씁니다:', e);
 // 본관: 정면이 +z인 모델을 운동장(+x) 쪽으로 돌리고 실제 크기(정면 79m, 깊이 39m, 높이 30m)로 늘린다
@@ -837,12 +837,43 @@ loadModel('bonkwan.glb','bkdata', (x,y,z) => [-110.5+z*21.7, (y+.53)*28.2, 10-x*
   (x,y,z,nx,ny,nz) => {
     const front = nx>.5, sideGlass = Math.abs(nz)>.6 && x>-98;
     // 밤 사진처럼: 유리벽은 대부분 어둡고 갈색 루버만 은은하게, 맨 위층 창만 차가운 흰 빛, 1층과 캐노피는 환하게
-    if (front && y>23.4 && y<25.2) return [.72,0,.5];         // 맨 위층 창: 노란 빛
     if (front && y>8.6 && y<=23.4) return [.03,0,.62];        // 유리벽: 루버에 비친 붉은 갈색 빛
     if (front && y>=25.2) return [0,0,.4];                  // 위쪽 금속 테두리
-    if (sideGlass && y>23.4 && y<25.2) return [.4,0,0];
     return 0;
-  }).then(m => { B.bonkwan = m.buf; T.bk = m.t; T.bkE = m.e; }).catch(warnModel('본관'));
+  }).then(m => { B.bonkwan = m.buf; T.bk = m.t; T.bkE = m.e; buildCurtainGlow(m.out); }).catch(warnModel('본관'));
+
+/* 밤의 본관 커튼월: 창마다 노란 빛이 나고, 멀리온·층 띠·세로 루버가 빛을 가르는 줄로 보인다.
+   모델의 유리면 바로 앞에 판 하나를 두고, 밤에만 빛을 더해 그린다. */
+function buildCurtainGlow(out){
+  let x1 = -1e9, z0 = 1e9, z1 = -1e9;
+  for (let t=0;t<out.length;t+=33){
+    const nx = out[t+3]+out[t+14]+out[t+25], y = (out[t+1]+out[t+12]+out[t+23])/3;
+    if (nx<1.5 || y<9 || y>25) continue;
+    for (const o of [t,t+11,t+22]){ x1 = Math.max(x1,out[o]); z0 = Math.min(z0,out[o+2]); z1 = Math.max(z1,out[o+2]); }
+  }
+  if (!(z1>z0)) return;
+  z0 += 1.2; z1 -= 1.2;
+  const Y0 = 9.4, Y1 = 25.1, W = z1-z0, Hm = Y1-Y0, CW = 2048, CH = 512, px = CW/W, py = CH/Hm;
+  const c = cv(CW,CH), x = c.getContext('2d'); x.fillStyle = '#000'; x.fillRect(0,0,CW,CH);
+  const X = m => m*px, Yc = m => CH-m*py;                 // 아래에서 m미터 위
+  const floors = [[0,3.9],[3.9,7.8],[7.8,11.7],[11.7,Hm]], bay = 1.5, nb = Math.round(W/bay);
+  floors.forEach((f,fi) => { for (let b=0;b<nb;b++){
+    const on = hash2(b*3.7+fi*11.3, fi*5.1) < .86 ? 1 : .3, a = X(b*W/nb), w = X(W/nb), top = Yc(f[1]), bot = Yc(f[0]);
+    const g = x.createLinearGradient(0,top,0,bot);
+    g.addColorStop(0,'rgba(222,186,118,'+on+')'); g.addColorStop(.55,'rgba(205,160,92,'+on+')'); g.addColorStop(1,'rgba(165,118,62,'+on+')');
+    x.fillStyle = g; x.fillRect(a,top,w+1,bot-top);
+  } });
+  x.fillStyle = '#000';
+  for (let b=0;b<=nb;b++) x.fillRect(X(b*W/nb)-1.5,0,3,CH);                                   // 세로 멀리온
+  for (const f of floors){ x.fillRect(0,Yc(f[1])-4,CW,8); x.fillRect(0,Yc(f[0]+.9)-1.2,CW,2.4); } // 층 띠와 낮은 가로살
+  x.fillRect(0,CH-6,CW,6);
+  // 세로 루버: 아래 두 층과 셋째 층에 엇갈린 두 줄
+  for (let k=0;k*1.0<W;k++){ const zz = X(k*1.0+.25); x.fillRect(zz-2.5,Yc(7.6),5,Yc(.9)-Yc(7.6)); }
+  for (let k=0;k*1.0<W;k++){ const zz = X(k*1.0+.75); x.fillRect(zz-2,Yc(11.6),4,Yc(8.6)-Yc(11.6)); }
+  const g = new Mesh(), fx = x1+.12;
+  g.quad([fx,Y0,z1],[fx,Y0,z0],[fx,Y1,z0],[fx,Y1,z1],WHITE);
+  B.glow = {b:vbo(new Float32Array(g.a)), n:g.a.length/11}; T.glowE = tex(c,false);
+}
 // 북쪽 생활관 단지: 뒷줄은 언덕을 따라 올린다
 const dormGlass = (r,g,b) => clamp((b-r-2)/8,0,1)*clamp((115-(r+g+b)/3)/30,0,1);
 loadModel('saenghwal.glb','nddata', (x,y,z) => [-152.5+z*62, (y+.151)*70+.1+(.9-z)/1.8*10, -110-x*76], (x,y,z) => [z/62, y/70, -x/76],
@@ -1405,6 +1436,7 @@ function frame(now){
   gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
   gl.useProgram(LIT.p); setAttribs(4);
   drawLit(B.fence,T.fence); drawLit(B.net,T.net);
+  if (B.glow && env.night>.02){ gl.blendFunc(gl.ONE,gl.ONE); drawLit(B.glow,T.black,T.glowE); gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA); }
 
   // 케이블 줄, 불빛, 비와 눈
   gl.useProgram(FLAT.p); setAttribs(1); gl.uniformMatrix4fv(FLAT.u.uVP,false,VP);
