@@ -996,7 +996,7 @@ let toastT = 0;
 function toast(msg){ const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 4500); }
 function spawnAnimal(forceDeer){
   const deer = forceDeer || Math.random()<.5, n = !deer && Math.random()<.4 ? 2 : 1, z0 = -22+Math.random()*44;
-  toast(deer ? '고라니가 뛰어들었어요 · 다가가서 타 보세요' : (n>1 ? '토끼 두 마리가 운동장에 들어왔어요' : '토끼 한 마리가 운동장에 들어왔어요'));
+  toast(deer ? '고라니가 나타났어요' : (n>1 ? '토끼 두 마리가 운동장에 들어왔어요' : '토끼 한 마리가 운동장에 들어왔어요'));
   for(let i=0;i<n;i++){
     const way = []; const k = 2+Math.floor(Math.random()*2);
     for(let j=0;j<k;j++) way.push([-30+Math.random()*55+i*2, -44+Math.random()*88]);
@@ -1007,13 +1007,14 @@ function spawnAnimal(forceDeer){
 function stepAnimals(dt,time){
   if (time>nextAnimal){ spawnAnimal(); nextAnimal = time + 22 + Math.random()*40; }
   for(let i=animals.length-1;i>=0;i--){
-    const a = animals[i], w = a.way[0];
-    if (a.ridden) continue;
-    if (!w){ animals.splice(i,1); continue; }
-    const near = Math.hypot(a.x-cam.x,a.z-cam.z)<9 && (!a.deer || (keys.ShiftLeft && !riding));
+    const a = animals[i];
+    if (a.ridden && a.way.length<3) a.way = [[-30+Math.random()*55,-44+Math.random()*88],[-30+Math.random()*55,-44+Math.random()*88],[-30+Math.random()*55,-44+Math.random()*88]].concat(a.way.slice(-2));
+    const w2 = a.way[0];
+    if (!w2){ animals.splice(i,1); continue; }
+    const near = !a.ridden && Math.hypot(a.x-cam.x,a.z-cam.z)<9 && (!a.deer || (keys.ShiftLeft && !riding));
     if (near && !a.flee){ a.flee = true; a.wait = 0; a.way = a.way.slice(-2); }
     if (a.wait>0 && !a.flee){ a.wait -= dt; a.v = 0; continue; }
-    const dx = w[0]-a.x, dz = w[1]-a.z, d = Math.hypot(dx,dz), sp = (a.deer?7.5:4.6)*(a.flee?1.5:1);
+    const dx = w2[0]-a.x, dz = w2[1]-a.z, d = Math.hypot(dx,dz), sp = (a.deer?7.5:4.6)*(a.flee?1.5:1);
     if (d<.8){ a.way.shift(); if (a.way.length>2 && !a.flee) a.wait = 1.5+Math.random()*4; continue; }
     const th = Math.atan2(dx,-dz); let dh = th-a.h; dh = Math.atan2(Math.sin(dh),Math.cos(dh)); a.h += dh*Math.min(1,dt*6);
     a.x += Math.sin(a.h)*sp*dt; a.z -= Math.cos(a.h)*sp*dt; a.v = sp; a.ph += dt*(a.deer?11:13)*(a.flee?1.3:1);
@@ -1265,12 +1266,13 @@ function frame(now){
   if (resting) mx = my = 0;
   if (seated>=0){ if (Math.hypot(mx,my)>.35) standUp(); else mx = my = 0; }
   if (lying){ if (Math.hypot(mx,my)>.35) setLie(false); else mx = my = 0; }
+  if (riding) mx = my = 0;   // 고라니가 가는 대로 간다
   const sp = Math.min(1,Math.hypot(mx,my)), v = (riding ? (keys.ShiftLeft?12:8) : (keys.ShiftLeft?8:4.6))*dt;
   const vx = Math.sin(cam.yaw)*my + Math.cos(cam.yaw)*mx, vz = -Math.cos(cam.yaw)*my + Math.sin(cam.yaw)*mx;
   const nx = clamp(cam.x + vx*v, -38, 54.8), nz = clamp(cam.z + vz*v, -55.4, 55.4);
   if (!blocked(nx,cam.z)) cam.x = nx; if (!blocked(cam.x,nz)) cam.z = nz;
   if (seated>=0){ const b = BENCHES[seated]; cam.x = b.x+Math.sin(b.h)*.04; cam.z = b.z-Math.cos(b.h)*.04; cam.head = b.h; }
-  if (riding){ riding.x = cam.x; riding.z = cam.z; riding.h = cam.head; riding.v = sp>.08 ? 8 : 0; riding.ph += dt*11*sp; }
+  if (riding){ cam.x = riding.x; cam.z = riding.z; cam.head = riding.h; }
   nearDeer = null; if (!riding && seated<0 && !lying){ let best = 3.2; for (const a of animals){ if (!a.deer) continue; const d = Math.hypot(a.x-cam.x,a.z-cam.z); if (d<best){ best = d; nearDeer = a; } } }
   nearBench = -1; { let best = 2.4*2.4; BENCHES.forEach((b,i) => { const d = (b.x-cam.x)**2+(b.z-cam.z)**2; if (d<best){ best = d; nearBench = i; } }); }
   { const lab = resting ? '' : riding ? '내리기' : (seated>=0 || lying) ? '일어나기' : nearDeer ? '고라니 타기' : nearBench>=0 ? '벤치에 앉기' : '';
@@ -1334,6 +1336,7 @@ function frame(now){
   }
   if (cur.rain>.3){ if (!umbCol) umbCol = Math.random()<.5 ? [.98,.82,.12] : [.86,.14,.13]; } else if (cur.rain<.1) umbCol = null;
   if (third){ const rb = riding && riding.v>0 ? Math.abs(Math.sin(riding.ph))*.14*1.45 : 0;
+    if (riding){ cam.x = riding.x; cam.z = riding.z; cam.head = riding.h; }
     person(gm,cam.x,gy+(riding ? .58+rb : 0),cam.z,cam.head,walk,riding?0:sp,hex3(SHIRTS[shirtI][1]),{sit:resting,chair:seated>=0,lie:lying,ride:!!riding,hat:hatI,umb:cur.rain>.3&&!riding?umbCol:null}); }
   for(const a of animals) drawAnimal(gm,a);
   drawBirds(gm,time); gm.blob(ball.x,ball.y+.15,ball.z,.14,.14,.14,[.96,.96,.94],3);
