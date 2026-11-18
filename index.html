@@ -57,6 +57,15 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--jade);outline-o
 /* 앉기·눕기에서 일어나기: 쉬기 화면의 '일어나기'와 같은 차분한 버튼 */
 .acts #bSit.quiet{height:44px;min-width:0;padding:0 20px;border-radius:22px;border:1px solid var(--line);background:var(--panel);color:var(--text);
   font-family:var(--body);font-size:14px;font-weight:400;box-shadow:none;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+#bWave{border:1px solid var(--line);background:var(--panel);color:var(--text);min-width:0;font-family:var(--body);font-size:14px;font-weight:400;box-shadow:none;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+#tags{position:fixed;inset:0;pointer-events:none;overflow:hidden}
+#tags span{position:absolute;transform:translate(-50%,-100%);padding:2px 8px;border-radius:10px;background:rgba(14,21,23,.62);color:var(--text);font-size:12px;white-space:nowrap}
+#tags span.wave::after{content:" 👋"}
+.gate .nick{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted);width:100%}
+.gate .nick input{height:42px;border-radius:12px;border:1px solid var(--line);background:rgba(14,21,23,.6);color:var(--text);padding:0 12px;font:inherit;font-size:15px;-webkit-user-select:text;user-select:text}
+#mpline{color:var(--jade)}
+body.mp .compass{top:124px}
+body.mp .toast{top:168px}
 #bFollow{border:1px solid var(--jade);background:var(--panel);color:var(--jade);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 #bFollow[aria-pressed="true"]{background:rgba(143,208,184,.22);color:var(--text)}
 .toast{position:fixed;left:50%;top:140px;transform:translateX(-50%);padding:7px 14px;border-radius:16px;background:var(--panel);
@@ -112,6 +121,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--jade);outline-o
   <p class="name">사이버 인재개발원</p>
   <p class="clock"><span id="clock">--:--</span><span id="phase"></span></p>
   <p class="wx" id="wxline"></p>
+  <p class="wx" id="mpline" hidden></p>
 </div>
 <div class="actions">
   <button id="bWx" type="button">설정</button>
@@ -122,9 +132,11 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--jade);outline-o
 <div class="compass" id="compass"></div>
 <div class="stick" id="stick"><i id="knob"></i></div>
 <p class="toast" id="toast" aria-live="polite"></p>
+<div id="tags" aria-hidden="true"></div>
 <div class="acts">
   <button id="bSit" type="button" hidden>벤치에 앉기</button>
   <button id="bFollow" type="button" aria-pressed="false" hidden>따라가기</button>
+  <button id="bWave" type="button" hidden>손 흔들기</button>
 </div>
 <p class="hint" id="hint">왼쪽 아래를 밀어 걷고, 화면을 끌어 둘러보세요</p>
 
@@ -161,6 +173,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--jade);outline-o
     <div class="row" id="sw1"></div>
     <h3>모자</h3>
     <div class="row" id="hat1"></div>
+    <label class="nick" for="nick"><span>이름</span><input id="nick" maxlength="10" autocomplete="off" placeholder="다른 사람에게 보이는 이름"></label>
     <button id="enter" type="button">들어서기</button>
   </div>
 </div>
@@ -1084,6 +1097,7 @@ function personRaw(m,x,y,z,h,ph,sw,shirt,o){
       m.seg(at(.3+sw2*.2,1.2+sw2*.4,.4),at(.55+sw2*.3,1.5+sw2*.5,.5),.025,[.2,.2,.2]); m.blob(at(.66+sw2*.3,1.68+sw2*.5,.52)[0],y+1.68+sw2*.5,at(.66+sw2*.3,0,.52)[2],.16,.2,.16,[.9,.85,.3],3); }
     else if (o.torch){ const hand = at(.4,1.08,.2), tip = at(.66,1.04,.21);
       m.seg(at(0,top-.04,.25),hand,.06,shirt); m.seg(hand,tip,.035,[.15,.15,.17]); o.torch.push(tip, at(4.2,.6,.4)); }
+    else if (o.wave){ const w = Math.sin(o.wave*9)*.12; m.seg(at(0,top-.04,.25),at(.08,top+.28,.42),.06,shirt); m.seg(at(.08,top+.28,.42),at(.1+w,top+.62,.46),.055,shirt); }
     else if (o.umb) m.seg(at(0,top-.04,.25),at(.2,top-.22,.24),.06,shirt);
     else m.seg(at(0,top-.04,.25),at(sn*.32,.92,.27),.06,shirt);
   }
@@ -1241,6 +1255,48 @@ function drawTennis(m,time){
   });
 }
 /* ───────── 화면 글자 ───────── */
+/* ───────── 함께 걷기: 다른 접속자 ───────── */
+const store2 = { get(k,d){ try { return localStorage.getItem(k) ?? d; } catch(e){ return d; } }, set(k,v){ try { localStorage.setItem(k,v); } catch(e){} } };
+let nick = store2.get('cp-nick','') || ('손님'+Math.floor(100+Math.random()*900));
+$('nick').value = store2.get('cp-nick','');
+$('nick').addEventListener('input', e => { const v = e.target.value.trim().slice(0,10); nick = v || nick; store2.set('cp-nick',v); });
+$('nick').addEventListener('keydown', e => e.stopPropagation());
+let myWave = -99, myWaveId = 0;
+$('bWave').onclick = () => { myWave = performance.now()/1000; myWaveId = Date.now(); firstTouch(); };
+const tagEls = new Map(); let lastMpCount = -1;
+function myPose(){ return riding ? 4 : petting ? 5 : lying ? 2 : seated>=0 ? 1 : resting ? 3 : 0; }
+function drawPeers(m,dt,time,VP){
+  const MP = window.MP; if (!MP || !MP.ok) return;
+  const k = 1-Math.exp(-dt*8), seen = new Set();
+  for (const [id,p] of MP.peers){
+    seen.add(id);
+    if (p.rx===undefined){ p.rx = p.x; p.rz = p.z; p.rh = p.h||0; p.ph = 0; }
+    const ox = p.rx, oz = p.rz; p.rx += (p.x-p.rx)*k; p.rz += (p.z-p.rz)*k;
+    let dh = (p.h||0)-p.rh; dh = Math.atan2(Math.sin(dh),Math.cos(dh)); p.rh += dh*k;
+    const mv = Math.hypot(p.rx-ox,p.rz-oz); p.ph += mv*1.6; const moving = mv/Math.max(dt,1e-3) > .4;
+    if (p.w && p.w!==p._lastW){ p._lastW = p.w; if (p._seenW){ p.waveUntil = time+2.6; if (Math.hypot(p.x-cam.x,p.z-cam.z)<40) toast((p.n||'손님')+'님이 손을 흔들어요'); } }
+    p._seenW = true;
+    const gyp = groundY(p.rx,p.rz), pose = p.p|0, shirt = hex3((SHIRTS[p.s|0]||SHIRTS[0])[1]), waving = p.waveUntil>time;
+    if (pose===4) drawAnimal(m,{deer:true,x:p.rx,z:p.rz,h:p.rh,v:moving?7:0,ph:p.ph*3,ridden:true});
+    person(m,p.rx,gyp+(pose===4?.58:0),p.rz,p.rh,p.ph,moving&&pose===0?1:0,shirt,
+      {chair:pose===1,lie:pose===2,sit:pose===3,ride:pose===4,crouch:pose===5?time+.01:0,hat:p.c|0,
+       umb:p.u===1?[.98,.82,.12]:p.u===2?[.86,.14,.13]:null,wave:waving&&pose===0?time:0});
+    // 이름표
+    let el = tagEls.get(id); if (!el){ el = document.createElement('span'); $('tags').appendChild(el); tagEls.set(id,el); }
+    const hy = gyp+(pose===2?.7:pose===4?2.9:pose===1||pose===3||pose===5?1.6:2.2);
+    const cx = VP[0]*p.rx+VP[4]*hy+VP[8]*p.rz+VP[12], cy = VP[1]*p.rx+VP[5]*hy+VP[9]*p.rz+VP[13], cw = VP[3]*p.rx+VP[7]*hy+VP[11]*p.rz+VP[15];
+    const far = Math.hypot(p.rx-cam.x,p.rz-cam.z);
+    if (cw>.5 && far<70){ el.style.display = ''; el.style.left = ((cx/cw*.5+.5)*innerWidth)+'px'; el.style.top = ((1-(cy/cw*.5+.5))*innerHeight)+'px';
+      if (el.textContent!==(p.n||'손님')) el.textContent = p.n||'손님'; el.classList.toggle('wave',waving); el.style.opacity = far>40 ? .55 : 1; }
+    else el.style.display = 'none';
+  }
+  for (const [id,el] of tagEls) if (!seen.has(id)){ el.remove(); tagEls.delete(id); }
+  if (MP.peers.size!==lastMpCount){ lastMpCount = MP.peers.size; $('mpline').hidden = false; document.body.classList.add('mp');
+    $('mpline').textContent = lastMpCount ? '지금 함께 있는 사람 '+lastMpCount+'명' : '지금은 혼자 걷고 있어요'; }
+  const pose = myPose();
+  MP.send({n:nick, x:Math.round(cam.x*10)/10, z:Math.round(cam.z*10)/10, h:Math.round(cam.head*100)/100, p:pose, s:shirtI, c:hatI,
+    u:cur.rain>.3&&umbCol&&pose!==2&&pose!==4 ? (umbCol[1]>.5?1:2) : 0, w:myWaveId});
+}
 const fmtClock = new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit',hour12:false});
 const fmtHour = new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Seoul',hour:'numeric',hour12:false});
 function phaseName(alt,ms){
@@ -1440,6 +1496,7 @@ function frame(now){
   if (seated>=0){ const b = BENCHES[seated]; cam.x = b.x+Math.sin(b.h)*.04; cam.z = b.z-Math.cos(b.h)*.04; cam.head = b.h; }
   if (riding){ cam.x = riding.x; cam.z = riding.z; cam.head = riding.h; }
   nearDeer = null; if (!riding && seated<0 && !lying){ let best = 3.2; for (const a of animals){ if (!a.deer) continue; const d = Math.hypot(a.x-cam.x,a.z-cam.z); if (d<best){ best = d; nearDeer = a; } } }
+  { const wv = !!(window.MP && window.MP.ok) && myPose()===0; if ($('bWave').hidden===wv) $('bWave').hidden = !wv; }
   { const any = animals.some(a => !a.ridden && a.x<54), lab = riding || resting || seated>=0 || lying ? '' : follow ? '그만 따라가기' : any ? '따라가기' : '';
     if (lab!==followLabel){ followLabel = lab; $('bFollow').hidden = !lab; if (lab) $('bFollow').textContent = lab; $('bFollow').setAttribute('aria-pressed', !!follow); } }
   nearRabbit = null; if (!riding && !petting && seated<0 && !lying){ let best = 2.2; for (const a of animals){ if (a.deer) continue; const d = Math.hypot(a.x-cam.x,a.z-cam.z); if (d<best){ best = d; nearRabbit = a; } } }
@@ -1520,7 +1577,8 @@ function frame(now){
   if (cur.rain>.3){ if (!umbCol) umbCol = Math.random()<.5 ? [.98,.82,.12] : [.86,.14,.13]; } else if (cur.rain<.1) umbCol = null;
   if (third){ const rb = riding && riding.v>0 ? Math.abs(Math.sin(riding.ph))*.14*1.45 : 0;
     if (riding){ cam.x = riding.x; cam.z = riding.z; cam.head = riding.h; }
-    person(gm,cam.x,gy+(riding ? .58+rb : 0),cam.z,cam.head,walk,riding?0:sp,hex3(SHIRTS[shirtI][1]),{sit:resting,chair:seated>=0,lie:lying,ride:!!riding,crouch:petting?time+.01:0,hat:hatI,umb:cur.rain>.3&&!riding?umbCol:null}); }
+    person(gm,cam.x,gy+(riding ? .58+rb : 0),cam.z,cam.head,walk,riding?0:sp,hex3(SHIRTS[shirtI][1]),{sit:resting,chair:seated>=0,lie:lying,ride:!!riding,crouch:petting?time+.01:0,hat:hatI,umb:cur.rain>.3&&!riding?umbCol:null,wave:time-myWave<2.6&&myPose()===0?time:0}); }
+  drawPeers(gm,dt,time,VP);
   for(const a of animals) drawAnimal(gm,a);
   drawBirds(gm,time); gm.blob(ball.x,ball.y+.15,ball.z,.14,.14,.14,[.96,.96,.94],3);
   if (tennisOn && cur.rain<.5) drawTennis(gm,time);
@@ -1618,6 +1676,36 @@ window.sansa = {me:() => [cam.x,cam.z],deer:() => spawnAnimal('deer'), rabbit:()
   look:(x,z,yawDeg,pitch) => { cam.x = x; cam.z = z; cam.yaw = yawDeg*rad; cam.pitch = pitch||0; }, sun:() => sunPos(Date.now()+previewH*36e5).alt/rad};
 requestAnimationFrame(frame);
 })();
+</script>
+<script type="module">
+// 함께 걷기 연결: Firebase Realtime Database. 연결하지 못하면 혼자 걷는 화면 그대로 둔다
+const cfg = {apiKey:'AIzaSyD_mVfq4ek6sJH3TeeiBQKnYgVWNXnNhhI', authDomain:'nhishrd.firebaseapp.com', projectId:'nhishrd',
+  storageBucket:'nhishrd.firebasestorage.app', messagingSenderId:'659932141353', appId:'1:659932141353:web:8ec2b7473d20c8d4cb4938',
+  databaseURL:'https://nhishrd-default-rtdb.asia-southeast1.firebasedatabase.app'};
+try {
+  const V = '10.12.2';
+  const {initializeApp} = await import('https://www.gstatic.com/firebasejs/'+V+'/firebase-app.js');
+  const D = await import('https://www.gstatic.com/firebasejs/'+V+'/firebase-database.js');
+  const db = D.getDatabase(initializeApp(cfg));
+  const id = Math.random().toString(36).slice(2,12);
+  const me = D.ref(db,'players/'+id); D.onDisconnect(me).remove();
+  const peers = new Map(); let offset = 0;
+  D.onValue(D.ref(db,'.info/serverTimeOffset'), s => { offset = s.val()||0; });
+  D.onValue(D.ref(db,'players'), snap => {
+    const v = snap.val()||{}, now = Date.now()+offset, seen = new Set();
+    for (const k in v){ const p = v[k]; if (k===id || !p || typeof p.x!=='number' || now-(p.t||0)>45000) continue;
+      seen.add(k); peers.set(k, Object.assign(peers.get(k)||{}, p)); }
+    for (const k of [...peers.keys()]) if (!seen.has(k)) peers.delete(k);
+  });
+  setInterval(() => { const now = Date.now()+offset; for (const [k,p] of peers) if (now-(p.t||0)>45000) peers.delete(k); }, 10000);
+  let last = 0, lastJson = '', lastBeat = 0;
+  window.MP = { ok:true, id, peers, send(st){
+    const now = performance.now(); if (now-last<200) return;
+    const j = JSON.stringify(st); if (j===lastJson && now-lastBeat<15000) return;
+    last = now; lastJson = j; lastBeat = now; D.set(me, Object.assign({}, st, {t:D.serverTimestamp()})).catch(e => console.warn('함께 걷기 저장 실패', e));
+  } };
+  addEventListener('pagehide', () => { D.remove(me); });
+} catch(e){ console.warn('함께 걷기에 연결하지 못해 혼자 걷기로 둡니다:', e); }
 </script>
 </body>
 </html>
