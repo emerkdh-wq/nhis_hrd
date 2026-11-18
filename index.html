@@ -54,6 +54,9 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--jade);outline-o
   display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.28)}
 .acts button[hidden]{display:none}
 #bSit{border:1px solid var(--jade);background:var(--jade);color:var(--ink)}
+/* 앉기·눕기에서 일어나기: 쉬기 화면의 '일어나기'와 같은 차분한 버튼 */
+.acts #bSit.quiet{height:44px;min-width:0;padding:0 20px;border-radius:22px;border:1px solid var(--line);background:var(--panel);color:var(--text);
+  font-family:var(--body);font-size:14px;font-weight:400;box-shadow:none;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 #bFollow{border:1px solid var(--jade);background:var(--panel);color:var(--jade);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 #bFollow[aria-pressed="true"]{background:rgba(143,208,184,.22);color:var(--text)}
 .toast{position:fixed;left:50%;top:140px;transform:translateX(-50%);padding:7px 14px;border-radius:16px;background:var(--panel);
@@ -1442,7 +1445,7 @@ function frame(now){
   if (petting){ const a = petting.a; cam.head = Math.atan2(a.x-cam.x,-(a.z-cam.z)); }
   nearBench = -1; { let best = 2.4*2.4; BENCHES.forEach((b,i) => { const d = (b.x-cam.x)**2+(b.z-cam.z)**2; if (d<best){ best = d; nearBench = i; } }); }
   { const lab = resting ? '' : riding ? '내리기' : (seated>=0 || lying) ? '일어나기' : petting ? '' : nearDeer ? '고라니 타기' : nearRabbit ? '토끼 쓰다듬기' : nearBench>=0 ? '벤치에 앉기' : '';
-    if (lab!==sitLabel){ sitLabel = lab; $('bSit').hidden = !lab; if (lab) $('bSit').textContent = lab; } }
+    if (lab!==sitLabel){ sitLabel = lab; $('bSit').hidden = !lab; if (lab) $('bSit').textContent = lab; $('bSit').classList.toggle('quiet', lab==='일어나기'); } }
   const gy = groundY(cam.x,cam.z);
   if (sp>.08){ let dh = Math.atan2(vx,-vz)-cam.head; dh = Math.atan2(Math.sin(dh),Math.cos(dh)); cam.head += dh*Math.min(1,dt*9); }
   walk += sp*dt*7.5;
