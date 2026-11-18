@@ -777,7 +777,7 @@ for(let i=0;i<NP;i++){ part[i*3]=rr(-16,16); part[i*3+1]=rr(0,14); part[i*3+2]=r
 /* ───────── 본관 3D 모델 (bonkwan.glb) ─────────
    모델은 정면이 +z, 가로 1.9 × 깊이 1.8 × 높이 1.09. 정면이 운동장(+x)을 보도록 돌리고
    실제 본관 크기(정면 79m, 깊이 39m, 높이 30m)에 맞게 늘린다. */
-async function loadModel(file, elId, pos, nor, glass){
+async function loadModel(file, elId, pos, nor, glass, emit){
   let buf; const emb = document.getElementById(elId);
   if (emb){ const bs = atob(emb.textContent.trim()), u = new Uint8Array(bs.length); for (let i=0;i<bs.length;i++) u[i] = bs.charCodeAt(i); buf = u.buffer; }
   else { const res = await fetch(file); if (!res.ok) throw new Error('HTTP '+res.status); buf = await res.arrayBuffer(); }
@@ -799,7 +799,24 @@ async function loadModel(file, elId, pos, nor, glass){
   // 밤 불빛: 유리 부분만 골라 따뜻한 빛을 띄운다. 칸마다 켜진 방과 꺼진 방을 섞는다.
   const S = 1024, ec = cv(S,S), ex = ec.getContext('2d'); ex.drawImage(img,0,0,S,S);
   const px = ex.getImageData(0,0,S,S), d = px.data;
-  for (let y=0;y<S;y++) for (let x=0;x<S;x++){
+  if (emit){
+    // 건물 부위별로 불을 켠다: 삼각형마다 실제 위치와 방향을 보고 밝기를 정해 질감 위에 칠한다
+    const mc = cv(S,S), mx = mc.getContext('2d'); mx.fillStyle = '#000'; mx.fillRect(0,0,S,S); mx.lineWidth = 2; mx.lineJoin = 'round';
+    for (let t=0;t<I.length;t+=3){
+      const a = t*11, b = a+11, c = a+22;
+      let nx = out[a+3]+out[b+3]+out[c+3], ny = out[a+4]+out[b+4]+out[c+4], nz = out[a+5]+out[b+5]+out[c+5]; const l = Math.hypot(nx,ny,nz)||1;
+      const e = emit((out[a]+out[b]+out[c])/3,(out[a+1]+out[b+1]+out[c+1])/3,(out[a+2]+out[b+2]+out[c+2])/3,nx/l,ny/l,nz/l);
+      if (!e) continue;
+      const col = 'rgb('+Math.round(e[0]*255)+','+Math.round(e[1]*255)+',0)';
+      mx.fillStyle = col; mx.strokeStyle = col; mx.beginPath();
+      mx.moveTo(out[a+9]*S,out[a+10]*S); mx.lineTo(out[b+9]*S,out[b+10]*S); mx.lineTo(out[c+9]*S,out[c+10]*S); mx.closePath(); mx.fill(); mx.stroke();
+    }
+    const md = mx.getImageData(0,0,S,S).data;
+    for (let i=0;i<d.length;i+=4){
+      const k = md[i]/255, w = md[i+1]/255, g = k>0 ? glass(d[i],d[i+1],d[i+2]) : 0, e = k*g;
+      d[i] = 255*e; d[i+1] = (214+30*w)*e; d[i+2] = (150+80*w)*e; d[i+3] = 255;   // w가 클수록 더 흰 빛 (로비)
+    }
+  } else for (let y=0;y<S;y++) for (let x=0;x<S;x++){
     const i = (y*S+x)*4, k = glass(d[i],d[i+1],d[i+2])*(hash2(x>>3,y>>3) < .55 ? 1 : .06)*.62;
     d[i] = 255*k; d[i+1] = 205*k; d[i+2] = 140*k; d[i+3] = 255;
   }
@@ -811,7 +828,16 @@ async function loadModel(file, elId, pos, nor, glass){
 const warnModel = name => e => console.warn(name+' 모델을 불러오지 못해 단순 모형을 씁니다:', e);
 // 본관: 정면이 +z인 모델을 운동장(+x) 쪽으로 돌리고 실제 크기(정면 79m, 깊이 39m, 높이 30m)로 늘린다
 loadModel('bonkwan.glb','bkdata', (x,y,z) => [-110.5+z*21.7, (y+.53)*28.2, 10-x*41.6], (x,y,z) => [z/21.7, y/28.2, -x/41.6],
-  (r,g,b) => clamp((b-r-12)/38,0,1)*clamp((b-55)/50,0,1)).then(m => { B.bonkwan = m.buf; T.bk = m.t; T.bkE = m.e; }).catch(warnModel('본관'));
+  // 유리는 푸른빛·회색이라 밝히고, 갈색 루버는 어둡게 남겨 실루엣이 보이게 한다
+  (r,g,b) => clamp((b-r+16)/30,0,1),
+  (x,y,z,nx,ny,nz) => {
+    const front = nx>.5, sideGlass = Math.abs(nz)>.6 && x>-98;
+    if (front && y>8.6 && y<25.2) return [.82,0];          // 위층 유리 커튼월: 따뜻한 노란 빛
+    if (front && y>.3 && y<7.4) return [.8,.6];             // 1층 로비: 밝고 흰 빛
+    if (ny<-.6 && y>5.5 && y<9.2 && x>-100) return [.55,.6]; // 캐노피 아랫면: 다운라이트에 비친 빛
+    if (sideGlass && y>8.6 && y<25.2) return [.45,0];
+    return 0;
+  }).then(m => { B.bonkwan = m.buf; T.bk = m.t; T.bkE = m.e; }).catch(warnModel('본관'));
 // 북쪽 생활관 단지: 뒷줄은 언덕을 따라 올린다
 const dormGlass = (r,g,b) => clamp((b-r-2)/8,0,1)*clamp((115-(r+g+b)/3)/30,0,1);
 loadModel('saenghwal.glb','nddata', (x,y,z) => [-152.5+z*62, (y+.151)*70+.1+(.9-z)/1.8*10, -110-x*76], (x,y,z) => [z/62, y/70, -x/76],
@@ -1252,6 +1278,8 @@ function drawLit(b,t,e,m){
 }
 function fogU(p,env,eye){ gl.uniform3fv(p.u.uCam,eye); gl.uniform3fv(p.u.uFogCol,env.fogCol); gl.uniform1f(p.u.uFog,cur.fog); }
 const lampFlat = new Float32Array(48); LAMPS.forEach((l,i) => lampFlat.set([l[0],5.3,l[1]],i*3));
+const soffit = []; for (let z=-24;z<=44;z+=4.6) for (const x of [-91.2,-93.6]) soffit.push(x,7.25,z);
+const soffitB = vbo(new Float32Array(soffit));
 const tGlowB = vbo(new Float32Array(tGlows.flat())), torchB = vbo(new Float32Array(3),true);
 const gm = new Mesh();
 let W = 0, Hh = 0, last = performance.now(), walk = 0, gateOpenAt = 0;
@@ -1386,6 +1414,8 @@ function frame(now){
     const farA = env.night*Math.exp(-Math.pow(1500*cur.fog,2));
     gl.uniform4f(FLAT.u.uCol,1,.88,.65,farA); gl.uniform1f(FLAT.u.uSize,14*pxScale);
     gl.bindBuffer(gl.ARRAY_BUFFER,farGlowB); gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0); gl.drawArrays(gl.POINTS,0,farGlows.length);
+    if (B.bonkwan){ gl.uniform4f(FLAT.u.uCol,1,.93,.78,env.night*.9); gl.uniform1f(FLAT.u.uSize,.55*pxScale);
+      gl.bindBuffer(gl.ARRAY_BUFFER,soffitB); gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0); gl.drawArrays(gl.POINTS,0,soffit.length/3); }
     gl.bindBuffer(gl.ARRAY_BUFFER,gondGlowB); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(gg),gl.DYNAMIC_DRAW);
     gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0); gl.uniform1f(FLAT.u.uSize,9*pxScale); gl.drawArrays(gl.POINTS,0,10);
     gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
