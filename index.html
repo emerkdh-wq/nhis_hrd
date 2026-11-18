@@ -738,7 +738,7 @@ const SKY = prog(
  'c+=uGlowCol*uGlow*(pow(az,4.)*exp(-h*5.)*.9+pow(sd,24.)*.35);'+
  'c+=uSunDisk*(smoothstep(.99985,.99995,sd)+pow(sd,900.)*.6);'+
  'if(uStars>.01){vec3 g=d*170.;vec3 id=floor(g);float hs=fract(sin(dot(id,vec3(12.9898,78.233,37.719)))*43758.5453);'+
- 'float sz=step(.996,hs)*.12;c+=vec3(.92,.95,1.)*uStars*step(.986,hs)*smoothstep(.2+sz,.02,length(fract(g)-.5))*(1.+sz*6.)*(.6+.4*sin(uTime*1.7+hs*90.))*smoothstep(0.,.12,d.y);vec3 mw=normalize(vec3(.62,.38,.69));float bd=dot(d,mw);vec3 t1=normalize(cross(mw,vec3(0.,1.,0.)));vec2 bp=vec2(atan(dot(d,t1),dot(d,cross(mw,t1)))*3.,bd*9.);float band=exp(-bd*bd/.028)*(.35+.9*fb(bp*1.3))*smoothstep(.62,.42,fb(bp*2.2+3.));float core=exp(-bd*bd/.006)*fb(bp*2.+9.);vec3 g2=d*420.;float h3=fract(sin(dot(floor(g2),vec3(39.3,11.1,71.7)))*43758.5453);c+=uStars*smoothstep(0.,.2,d.y)*(vec3(.5,.55,.72)*band*.3+vec3(.75,.7,.6)*core*.17+vec3(.85,.9,1.)*step(.985,h3)*band*smoothstep(.3,.05,length(fract(g2)-.5))*.8);}'+
+ 'float sz=step(.996,hs)*.12;c+=vec3(.92,.95,1.)*uStars*step(.986,hs)*smoothstep(.2+sz,.02,length(fract(g)-.5))*(1.+sz*6.)*(.6+.4*sin(uTime*1.7+hs*90.))*smoothstep(0.,.12,d.y);vec3 mw=normalize(vec3(.62,.38,.69));float bd=dot(d,mw);c+=uStars*smoothstep(0.,.2,d.y)*vec3(.42,.46,.62)*exp(-bd*bd/.016)*.085;}'+
  'float md=dot(d,uMoonDir);if(md>.9997&&uMoonVis>.01){vec3 r=normalize(cross(uMoonDir,vec3(0.,1.,0.)));vec3 u=cross(r,uMoonDir);'+
  'vec2 q=vec2(dot(d,r),dot(d,u))/.0245;float qq=dot(q,q);float w=sqrt(max(1.-qq,0.));vec3 nn=normalize(q.x*r+q.y*u-w*uMoonDir);'+
  'float lit=smoothstep(-.05,.2,dot(nn,uSunDir));c=mix(c,vec3(.97,.95,.86)*(.06+lit),uMoonVis*smoothstep(1.,.85,qq));}'+
@@ -754,6 +754,15 @@ const WAT = prog(
  'vec3 n=normalize(vec3((sin(p.x*.21+uTime*.7)+sin(p.y*.37+uTime*.9))*.035*am,1.,(sin(p.y*.19-uTime*.6)+sin(p.x*.43+uTime*.8))*.035*am));'+
  'float fr=pow(1.-max(dot(V,n),0.),4.);vec3 R=reflect(-V,n);vec3 sky=mix(uHor,uZen,pow(max(R.y,0.),.5));'+
  'vec3 c=mix(uDeep,sky,.3+.65*fr)+uSunCol*pow(max(dot(R,uSunDir),0.),260.)*1.2;gl_FragColor=vec4(fog(c,vP),1.);}');
+const MW = prog(
+ 'attribute vec3 aP,aC;attribute float aB;uniform mat4 uVP;uniform float uPx,uTime,uCover;uniform vec2 uWind;varying vec3 vC;varying float vA;'+
+ 'float h2(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}'+
+ 'float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h2(i),h2(i+vec2(1,0)),f.x),mix(h2(i+vec2(0,1)),h2(i+vec2(1,1)),f.x),f.y);}'+
+ 'float fb(vec2 p){float s=0.,a=.5;for(int i=0;i<5;i++){s+=a*vn(p);p=p*2.03+7.1;a*=.5;}return s;}'+
+ 'void main(){vec4 p=uVP*vec4(aP*50.,1.);gl_Position=p.xyww;vec3 d=aP;float cl=0.;'+
+ 'if(d.y>0.){vec2 uv=d.xz/(d.y+.14)*.85+uWind*uTime;float lo=mix(.74,.2,uCover);cl=smoothstep(lo,lo+.2,fb(uv))*smoothstep(0.,.1,d.y);}'+
+ 'vA=aB*(1.-cl*.98)*smoothstep(0.,.14,d.y)*(.75+.25*sin(uTime*1.3+aB*80.+aP.x*40.));vC=aC;gl_PointSize=(1.3+aB*2.)*uPx;}',
+ 'varying vec3 vC;varying float vA;uniform float uStars;void main(){float r=length(gl_PointCoord-.5)*2.;gl_FragColor=vec4(vC*vA*uStars*pow(max(1.-r,0.),1.5),1.);}');
 const FLAT = prog(
  'attribute vec3 aP;uniform mat4 uVP;uniform float uSize;void main(){gl_Position=uVP*vec4(aP,1.);gl_PointSize=clamp(uSize/gl_Position.w,1.5,90.);}',
  'uniform vec4 uCol;uniform float uRound;void main(){float a=1.;if(uRound>.5){float d=length(gl_PointCoord-.5)*2.;a=pow(max(1.-d,0.),uRound);}gl_FragColor=vec4(uCol.rgb,uCol.a*a);}');
@@ -1312,6 +1321,28 @@ function bindLit(buf){
 }
 for(const p of [LIT]){ gl.bindAttribLocation(p.p,0,'aP'); gl.bindAttribLocation(p.p,1,'aN'); gl.bindAttribLocation(p.p,2,'aC'); gl.bindAttribLocation(p.p,3,'aU'); gl.linkProgram(p.p);
   const n = gl.getProgramParameter(p.p,gl.ACTIVE_UNIFORMS); for(let i=0;i<n;i++){ const nm = gl.getActiveUniform(p.p,i).name.replace('[0]',''); p.u[nm] = gl.getUniformLocation(p.p,nm); } }
+{ const p = MW; gl.bindAttribLocation(p.p,0,'aP'); gl.bindAttribLocation(p.p,1,'aB'); gl.bindAttribLocation(p.p,2,'aC'); gl.linkProgram(p.p);
+  const n = gl.getProgramParameter(p.p,gl.ACTIVE_UNIFORMS); for(let i=0;i<n;i++){ const nm = gl.getActiveUniform(p.p,i).name.replace('[0]',''); p.u[nm] = gl.getUniformLocation(p.p,nm); } }
+// 은하수 별 알갱이: 하늘을 비스듬히 가로지르는 큰 원을 따라 수천 개의 별을 뿌린다. 가운데는 촘촘하고, 군데군데 비어 있는 먼지띠가 있다
+const MWB = (() => {
+  const nrm = [.62,.38,.69], l0 = Math.hypot(...nrm), N = nrm.map(v => v/l0);
+  let t1 = [N[1]*0-N[2]*1, N[2]*0-N[0]*0, N[0]*1-N[1]*0]; const l1 = Math.hypot(...t1); t1 = t1.map(v => v/l1);
+  const t2 = [N[1]*t1[2]-N[2]*t1[1], N[2]*t1[0]-N[0]*t1[2], N[0]*t1[1]-N[1]*t1[0]];
+  const gauss = () => { let u = 0; for (let k=0;k<6;k++) u += Math.random(); return (u-3)/1.2; };
+  const out = []; let n = 0;
+  while (n<26000){
+    const th = Math.random()*6.2832, core = Math.exp(-((Math.atan2(Math.sin(th-2.4),Math.cos(th-2.4)))**2)/.5);
+    const sig = .05+.07*core, b = gauss()*sig;
+    const dust = vnoise(th*5+3,b*28+7), keep = (.35+.65*core)*(Math.abs(b)<.02 && dust<.42 ? .15 : 1);
+    if (Math.random()>keep) continue;
+    const cb = Math.cos(b), sb = Math.sin(b);
+    const d = [0,1,2].map(k => cb*(Math.cos(th)*t1[k]+Math.sin(th)*t2[k])+sb*N[k]);
+    const br = Math.pow(Math.random(),2.4)*1.1+.16, warm = core*Math.random();
+    const col = [.78+.22*warm, .82+.08*warm, 1-.3*warm];
+    out.push(d[0],d[1],d[2],br,col[0],col[1],col[2]); n++;
+  }
+  return {b:vbo(new Float32Array(out)), n};
+})();
 for(const p of [SKY,WAT,FLAT]){ gl.bindAttribLocation(p.p,0,'aP'); gl.linkProgram(p.p);
   const n = gl.getProgramParameter(p.p,gl.ACTIVE_UNIFORMS); for(let i=0;i<n;i++){ const nm = gl.getActiveUniform(p.p,i).name.replace('[0]',''); p.u[nm] = gl.getUniformLocation(p.p,nm); } }
 function setAttribs(n){ for(let i=0;i<4;i++){ if(i<n) gl.enableVertexAttribArray(i); else gl.disableVertexAttribArray(i); } }
@@ -1395,6 +1426,14 @@ function frame(now){
   gl.uniform1f(SKY.u.uGlow,env.glow); gl.uniform1f(SKY.u.uStars,env.stars); gl.uniform1f(SKY.u.uCover,cur.cover);
   gl.uniform1f(SKY.u.uTime,time%3600); gl.uniform1f(SKY.u.uMoonVis,env.moonVis*(1-sstep(.6,.95,cur.cover))); gl.uniform2f(SKY.u.uWind,.012,.005);
   gl.drawArrays(gl.TRIANGLES,0,cube.n);
+  if (env.stars>.01){   // 은하수 별 알갱이
+    gl.enable(gl.BLEND); gl.blendFunc(gl.ONE,gl.ONE); gl.useProgram(MW.p);
+    gl.enableVertexAttribArray(1); gl.enableVertexAttribArray(2);
+    gl.bindBuffer(gl.ARRAY_BUFFER,MWB.b); gl.vertexAttribPointer(0,3,gl.FLOAT,false,28,0); gl.vertexAttribPointer(1,1,gl.FLOAT,false,28,12); gl.vertexAttribPointer(2,3,gl.FLOAT,false,28,16);
+    gl.uniformMatrix4fv(MW.u.uVP,false,VP0); gl.uniform1f(MW.u.uPx,dpr); gl.uniform1f(MW.u.uTime,time%3600); gl.uniform1f(MW.u.uCover,cur.cover);
+    gl.uniform2f(MW.u.uWind,.012,.005); gl.uniform1f(MW.u.uStars,env.stars);
+    gl.drawArrays(gl.POINTS,0,MWB.n); gl.disable(gl.BLEND);
+  }
 
   // 땅과 구조물
   gl.enable(gl.DEPTH_TEST); gl.depthMask(true);
