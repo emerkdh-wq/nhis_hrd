@@ -818,7 +818,7 @@ async function loadModel(file, elId, pos, nor, glass, emit){
       if (!k && !lv){ d[i] = d[i+1] = d[i+2] = 0; d[i+3] = 255; continue; }
       const g = glass(d[i],d[i+1],d[i+2]), e = k*g, f = lv*(1-g)*clamp((d[i]+d[i+1]+d[i+2])/240,.3,1);
       const cr = w<.5 ? 255 : 255-80*(w-.5), cg = w<.5 ? 200+88*w : 244-14*(w-.5), cb = w<.5 ? 120+220*w : 230+50*(w-.5);
-      d[i] = Math.min(255,cr*e+235*f); d[i+1] = Math.min(255,cg*e+120*f); d[i+2] = Math.min(255,cb*e+70*f); d[i+3] = 255;
+      d[i] = Math.min(255,cr*e+64*f); d[i+1] = Math.min(255,cg*e+67*f); d[i+2] = Math.min(255,cb*e+74*f);   // 루버와 테두리는 짙은 회색으로 d[i+3] = 255;
     }
   } else for (let y=0;y<S;y++) for (let x=0;x<S;x++){
     const i = (y*S+x)*4, k = glass(d[i],d[i+1],d[i+2])*(hash2(x>>3,y>>3) < .55 ? 1 : .06)*.62;
@@ -839,7 +839,7 @@ loadModel('bonkwan.glb','bkdata', (x,y,z) => [-110.5+z*21.7, (y+.53)*28.2, 10-x*
     // 밤 사진처럼: 유리벽은 대부분 어둡고 갈색 루버만 은은하게, 맨 위층 창만 차가운 흰 빛, 1층과 캐노피는 환하게
     if (front && y>23.4 && y<25.2) return [.72,0,.5];         // 맨 위층 창: 노란 빛
     if (front && y>8.6 && y<=23.4) return [.03,0,.62];        // 유리벽: 루버에 비친 붉은 갈색 빛
-    if (front && y>=25.2) return [0,0,.13];                  // 위쪽 금속 테두리
+    if (front && y>=25.2) return [0,0,.4];                  // 위쪽 금속 테두리
     if (sideGlass && y>23.4 && y<25.2) return [.4,0,0];
     return 0;
   }).then(m => { B.bonkwan = m.buf; T.bk = m.t; T.bkE = m.e; }).catch(warnModel('본관'));
