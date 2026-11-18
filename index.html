@@ -839,7 +839,8 @@ loadModel('bonkwan.glb','bkdata', (x,y,z) => [-110.5+z*21.7, (y+.53)*28.2, 10-x*
     // 밤 사진처럼: 유리벽은 대부분 어둡고 갈색 루버만 은은하게, 맨 위층 창만 차가운 흰 빛, 1층과 캐노피는 환하게
     if (front && y>8.6 && y<=23.4) return [.03,0,.62];        // 유리벽: 루버에 비친 붉은 갈색 빛
     if (front && y>=25.2) return [0,0,.4];                  // 위쪽 금속 테두리
-    return 0;
+    if (front && y>.3 && y<8.4) return [.24,0,.3];          // 1·2층: 약한 노란 빛
+    return [0,0,.3];                                         // 나머지 면: 짙은 회색 윤곽이 살짝 보이게
   }).then(m => { B.bonkwan = m.buf; T.bk = m.t; T.bkE = m.e; buildCurtainGlow(m.out); }).catch(warnModel('본관'));
 
 /* 밤의 본관 커튼월: 창마다 노란 빛이 나고, 멀리온·층 띠·세로 루버가 빛을 가르는 줄로 보인다.
@@ -858,7 +859,7 @@ function buildCurtainGlow(out){
   const X = m => m*px, Yc = m => CH-m*py;                 // 아래에서 m미터 위
   const floors = [[0,3.9],[3.9,7.8],[7.8,11.7],[11.7,Hm]], bay = 4, nb = Math.round(W/bay);   // 세로 창틀 4m 간격
   floors.forEach((f,fi) => { for (let b=0;b<nb;b++){
-    const on = hash2(b*3.7+fi*11.3, fi*5.1) < .86 ? 1 : .3, a = X(b*W/nb), w = X(W/nb), top = Yc(f[1]), bot = Yc(f[0]);
+    const on = 1, a = X(b*W/nb), w = X(W/nb), top = Yc(f[1]), bot = Yc(f[0]);
     const g = x.createLinearGradient(0,top,0,bot);
     g.addColorStop(0,'rgba(222,186,118,'+on+')'); g.addColorStop(.55,'rgba(205,160,92,'+on+')'); g.addColorStop(1,'rgba(165,118,62,'+on+')');
     x.fillStyle = g; x.fillRect(a,top,w+1,bot-top);
@@ -868,8 +869,8 @@ function buildCurtainGlow(out){
   for (const f of floors){ x.fillRect(0,Yc(f[1])-4,CW,8); x.fillRect(0,Yc(f[0]+.9)-1.2,CW,2.4); } // 층 띠와 낮은 가로살
   x.fillRect(0,CH-6,CW,6);
   // 세로 루버: 아래 두 층과 셋째 층에 엇갈린 두 줄
-  for (let k=0;k*1.0<W;k++){ const zz = X(k*1.0+.25); x.fillRect(zz-2.5,Yc(7.6),5,Yc(.9)-Yc(7.6)); }
-  for (let k=0;k*1.0<W;k++){ const zz = X(k*1.0+.75); x.fillRect(zz-2,Yc(11.6),4,Yc(8.6)-Yc(11.6)); }
+  for (let k=0;k*2.2<W;k++){ const zz = X(k*2.2+.55); x.fillRect(zz-2.5,Yc(7.6),5,Yc(.9)-Yc(7.6)); }
+  for (let k=0;k*2.2<W;k++){ const zz = X(k*2.2+1.65); x.fillRect(zz-2,Yc(11.6),4,Yc(8.6)-Yc(11.6)); }
   const g = new Mesh(), fx = x1+.12;
   g.quad([fx,Y0,z1],[fx,Y0,z0],[fx,Y1,z0],[fx,Y1,z1],WHITE);
   B.glow = {b:vbo(new Float32Array(g.a)), n:g.a.length/11}; T.glowE = tex(c,false);
