@@ -1003,6 +1003,16 @@ function person(m,x,y,z,h,ph,sw,shirt,o){
 function personRaw(m,x,y,z,h,ph,sw,shirt,o){
   o = o||{}; const PANTS = o.pants || PANTS0; const f=[Math.sin(h),-Math.cos(h)], r=[Math.cos(h),Math.sin(h)];
   const at=(fx,up,rx)=>[x+f[0]*fx+r[0]*rx, y+up, z+f[1]*fx+r[1]*rx], sn=Math.sin(ph)*sw;
+  if (o.knees){   // 잔디에 앉아 무릎을 세우고 두 팔로 감싼 채 하늘을 올려다본다
+    const top = .74;
+    for(const sd of [-1,1]){ m.seg(at(0,.16,sd*.11),at(.38,.52,sd*.13),.085,PANTS); m.seg(at(.38,.52,sd*.13),at(.56,.06,sd*.12),.075,PANTS);
+      m.seg(at(-.06,top-.06,sd*.23),at(.3,.44,sd*.2),.06,shirt); }
+    m.seg(at(-.02,.14,0),at(-.1,top,0),.17,shirt);
+    const hd = at(-.13,top+.19,0); m.blob(hd[0],hd[1],hd[2],.14,.15,.14,SKIN,1);
+    const hr = at(-.2,top+.22,0); m.blob(hr[0],hr[1],hr[2],.155,.14,.155,HAIR,2);
+    if (o.longHair){ const lh = at(-.24,top-.02,0); m.blob(lh[0],lh[1],lh[2],.15,.24,.17,HAIR,9); }
+    return;
+  }
   if (o.lie){   // 잔디에 등을 대고 눕는다: 발이 앞쪽, 두 팔은 머리 뒤
     for(const sd of [-1,1]){ m.seg(at(.05,.1,sd*.11),at(.9,.09,sd*.14),.085,PANTS);
       m.seg(at(-.5,.12,sd*.23),at(-.8,.1,sd*.45),.06,shirt); m.seg(at(-.8,.1,sd*.45),at(-.78,.08,sd*.14),.055,shirt); }
@@ -1170,8 +1180,8 @@ function drawWalkers(m,ms,torchOut){
     person(m,p[0]-r[0]*.36,.04,p[1]-r[1]*.36,p[2],ph*1.12,.4,[.86,.42,.38],{height:1.6,longHair:true,pants:[.82,.78,.7],umb:umb?[.98,.82,.12]:null});
     person(m,p[0]+r[0]*.38,.04,p[1]+r[1]*.38,p[2],ph+1.4,.42,[.2,.3,.45],{height:1.8,pants:[.3,.27,.24],umb:umb?[.86,.14,.13]:null});
   }
-  if (sec<1800 && WX[wxKey].cover<.5 && cur.rain<.1 && cur.snow<.1){   // 자정~0시 30분, 맑은 밤: 가운데서 누워 은하수를 본다
-    person(m,-.6,.04,1.4,-2.2,0,0,[.62,.68,.86],{lie:true,longHair:true,pants:[.25,.26,.32]});
+  if (sec<1800 && WX[wxKey].cover<.5 && cur.rain<.1 && cur.snow<.1){   // 자정~0시 30분, 맑은 밤: 가운데 앉아 남서쪽 하늘의 은하수를 본다
+    person(m,-.6,.04,1.4,-3*Math.PI/4,0,0,[.62,.68,.86],{knees:true,longHair:true,pants:[.25,.26,.32]});   // 남서쪽 하늘을 본다
   }
   if (sec>=23*3600){                           // 밤 순찰 산책: 손전등을 앞으로 비춘다
     const dist = (sec-23*3600)*1.1, p = loopAt(dist+LOOP.len/2);
