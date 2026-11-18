@@ -868,9 +868,6 @@ function buildCurtainGlow(out){
   for (let b=0;b<=nb;b++) x.fillRect(X(b*W/nb)-1.5,0,3,CH);                                   // 세로 멀리온
   for (const f of floors){ x.fillRect(0,Yc(f[1])-4,CW,8); x.fillRect(0,Yc(f[0]+.9)-1.2,CW,2.4); } // 층 띠와 낮은 가로살
   x.fillRect(0,CH-6,CW,6);
-  // 세로 루버: 아래 두 층과 셋째 층에 엇갈린 두 줄
-  for (let k=0;k*2.2<W;k++){ const zz = X(k*2.2+.55); x.fillRect(zz-2.5,Yc(7.6),5,Yc(.9)-Yc(7.6)); }
-  for (let k=0;k*2.2<W;k++){ const zz = X(k*2.2+1.65); x.fillRect(zz-2,Yc(11.6),4,Yc(8.6)-Yc(11.6)); }
   const g = new Mesh(), fx = x1+.12;
   g.quad([fx,Y0,z1],[fx,Y0,z0],[fx,Y1,z0],[fx,Y1,z1],WHITE);
   B.glow = {b:vbo(new Float32Array(g.a)), n:g.a.length/11}; T.glowE = tex(c,false);
