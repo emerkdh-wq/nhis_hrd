@@ -1399,8 +1399,9 @@ function frame(now){
   gl.drawElements(gl.TRIANGLES,terr.idx.length,gl.UNSIGNED_SHORT,0);
   drawLit(B.props); drawLit(B.field,T.field); drawLit(B.court,T.court); drawLit(B.tennis,T.tennis);
   // 본관 조명은 밤 11시에 꺼지고 다음 날 저녁에 다시 켜진다. 가로등은 밤새 켜져 있다
-  const bkSec = seoulSec(ms), bkOn = bkSec>=23*3600 || bkSec<6*3600 ? 0 : 1;
-  gl.uniform1f(LIT.u.uNight,env.night*bkOn);
+  // 흐리거나 비·눈이 오는 날은 낮에도 본관 불을 켠다
+  const bkSec = seoulSec(ms), bkOn = bkSec>=23*3600 || bkSec<6*3600 ? 0 : 1, bkLight = Math.max(env.night, .75*sstep(.6,.85,cur.cover))*bkOn;
+  gl.uniform1f(LIT.u.uNight,bkLight);
   if (B.bonkwan) drawLit(B.bonkwan,T.bk,T.bkE); else { drawLit(B.main); drawLit(B.facade,T.facade,T.facadeE); drawLit(B.mainLobby,null,T.lobbyE); }
   gl.uniform1f(LIT.u.uNight,env.night);
   if (B.north) drawLit(B.north,T.north,T.northE); else { drawLit(B.nf[0]); drawLit(B.nf[1],T.dorm,T.dormE); drawLit(B.nf[2],null,T.lobbyE); }
@@ -1438,7 +1439,7 @@ function frame(now){
   gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
   gl.useProgram(LIT.p); setAttribs(4);
   drawLit(B.fence,T.fence); drawLit(B.net,T.net);
-  if (B.glow && env.night>.02 && bkOn){ gl.blendFunc(gl.ONE,gl.ONE); drawLit(B.glow,T.black,T.glowE); gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA); }
+  if (B.glow && bkLight>.02){ gl.uniform1f(LIT.u.uNight,bkLight); gl.blendFunc(gl.ONE,gl.ONE); drawLit(B.glow,T.black,T.glowE); gl.uniform1f(LIT.u.uNight,env.night); gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA); }
 
   // 케이블 줄, 불빛, 비와 눈
   gl.useProgram(FLAT.p); setAttribs(1); gl.uniformMatrix4fv(FLAT.u.uVP,false,VP);
