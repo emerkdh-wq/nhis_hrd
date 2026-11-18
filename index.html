@@ -934,7 +934,13 @@ function syncHat(){ for(const id of ['hat1','hat2']) [...$(id).children].forEach
 syncHat();
 const SKIN = [.93,.76,.62], HAIR = [.12,.1,.09], PANTS0 = [.2,.22,.27];
 // 사람: 발밑 (x,y,z), 바라보는 방향 h, 걸음 위상 ph, 흔들림 sw
+// 키 맞추기: 기본 모형은 머리끝까지 1.81m. o.height(미터)를 주면 발밑을 기준으로 통째로 줄이거나 늘린다
 function person(m,x,y,z,h,ph,sw,shirt,o){
+  const st = m.a.length; personRaw(m,x,y,z,h,ph,sw,shirt,o);
+  if (o && o.height){ const k = o.height/1.81, a = m.a;
+    for (let i=st;i<a.length;i+=11){ a[i] = x+(a[i]-x)*k; a[i+1] = y+(a[i+1]-y)*k; a[i+2] = z+(a[i+2]-z)*k; } }
+}
+function personRaw(m,x,y,z,h,ph,sw,shirt,o){
   o = o||{}; const PANTS = o.pants || PANTS0; const f=[Math.sin(h),-Math.cos(h)], r=[Math.cos(h),Math.sin(h)];
   const at=(fx,up,rx)=>[x+f[0]*fx+r[0]*rx, y+up, z+f[1]*fx+r[1]*rx], sn=Math.sin(ph)*sw;
   if (o.lie){   // 잔디에 등을 대고 눕는다: 발이 앞쪽, 두 팔은 머리 뒤
@@ -1086,8 +1092,8 @@ function drawWalkers(m,ms,torchOut){
   const sec = seoulSec(ms), umb = cur.rain>.3;
   if (sec>=12*3600 && sec<13*3600){            // 점심 산책: 초속 0.9m, 나란히
     const dist = (sec-12*3600)*.9, p = loopAt(dist), r = [Math.cos(p[2]),Math.sin(p[2])], ph = dist*2.6;
-    person(m,p[0]-r[0]*.36,.04,p[1]-r[1]*.36,p[2],ph,.42,[.86,.42,.38],{longHair:true,pants:[.82,.78,.7],umb:umb?[.98,.82,.12]:null});
-    person(m,p[0]+r[0]*.38,.04,p[1]+r[1]*.38,p[2],ph+1.4,.42,[.2,.3,.45],{pants:[.3,.27,.24],umb:umb?[.86,.14,.13]:null});
+    person(m,p[0]-r[0]*.36,.04,p[1]-r[1]*.36,p[2],ph*1.12,.4,[.86,.42,.38],{height:1.6,longHair:true,pants:[.82,.78,.7],umb:umb?[.98,.82,.12]:null});
+    person(m,p[0]+r[0]*.38,.04,p[1]+r[1]*.38,p[2],ph+1.4,.42,[.2,.3,.45],{height:1.8,pants:[.3,.27,.24],umb:umb?[.86,.14,.13]:null});
   }
   if (sec<1800 && WX[wxKey].cover<.5 && cur.rain<.1 && cur.snow<.1){   // 자정~0시 30분, 맑은 밤: 가운데서 누워 은하수를 본다
     person(m,-.6,.04,1.4,-2.2,0,0,[.62,.68,.86],{lie:true,longHair:true,pants:[.25,.26,.32]});
