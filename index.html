@@ -71,6 +71,8 @@ body.mp .toast{top:168px}
 .toast{position:fixed;left:50%;top:140px;transform:translateX(-50%);padding:7px 14px;border-radius:16px;background:var(--panel);
   border:1px solid var(--jade);font-size:13px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .6s}
 .toast.on{opacity:1}
+.toast.on.tap{pointer-events:auto;cursor:pointer}
+.toast.tap:active{background:rgba(143,208,184,.25)}
 
 .sheet{position:fixed;left:12px;right:12px;bottom:12px;max-width:460px;margin:0 auto;padding:16px;border-radius:18px;
   background:rgba(14,21,23,.86);border:1px solid var(--line);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
@@ -1120,16 +1122,24 @@ function blocked(x,z){
 /* ───────── 고라니와 토끼 ───────── */
 const animals = []; let nextAnimal = 10;
 let toastT = 0;
-function toast(msg){ const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 4500); }
+// target이 있으면 알림을 누를 때 그 동물을 따라간다
+let toastTarget = null;
+function toast(msg,target){ const t = $('toast'); t.textContent = msg; toastTarget = target||null; t.classList.toggle('tap',!!target); t.classList.add('on');
+  clearTimeout(toastT); toastT = setTimeout(() => { t.classList.remove('on'); toastTarget = null; }, target ? 7000 : 4500); }
+$('toast').addEventListener('click', () => {
+  const a = toastTarget; if (!a || !animals.includes(a) || a.ridden || riding || resting || seated>=0 || lying) return;
+  petting = null; follow = a; firstTouch(); $('toast').classList.remove('on'); toastTarget = null;
+});
 function spawnAnimal(kind){
   const deer = kind==='deer' || (kind!=='rabbit' && Math.random()<.5), n = !deer && Math.random()<.4 ? 2 : 1, z0 = -22+Math.random()*44;
-  toast(deer ? '고라니가 나타났어요' : (n>1 ? '토끼 두 마리가 운동장에 들어왔어요' : '토끼 한 마리가 운동장에 들어왔어요'));
+  const first = animals.length;
   for(let i=0;i<n;i++){
     const way = []; const k = 2+Math.floor(Math.random()*2);
     for(let j=0;j<k;j++) way.push([-30+Math.random()*55+i*2, -44+Math.random()*88]);
     way.push([48, -22+Math.random()*44], [60, -40+Math.random()*20]);
     animals.push({deer, x:50+i*2, z:z0+i*1.5, h:-1.57, ph:Math.random()*6, way, wait:0, flee:false, v:0});
   }
+  toast(deer ? '고라니가 나타났어요' : (n>1 ? '토끼 두 마리가 운동장에 들어왔어요' : '토끼 한 마리가 운동장에 들어왔어요'), animals[first]);
 }
 function stepAnimals(dt,time){
   if (time>nextAnimal){ spawnAnimal(); nextAnimal = time + 22 + Math.random()*40; }
@@ -1497,7 +1507,7 @@ function frame(now){
   if (riding){ cam.x = riding.x; cam.z = riding.z; cam.head = riding.h; }
   nearDeer = null; if (!riding && seated<0 && !lying){ let best = 3.2; for (const a of animals){ if (!a.deer) continue; const d = Math.hypot(a.x-cam.x,a.z-cam.z); if (d<best){ best = d; nearDeer = a; } } }
   { const wv = !!(window.MP && window.MP.ok) && myPose()===0; if ($('bWave').hidden===wv) $('bWave').hidden = !wv; }
-  { const any = animals.some(a => !a.ridden && a.x<54), lab = riding || resting || seated>=0 || lying ? '' : follow ? '그만 따라가기' : any ? '따라가기' : '';
+  { const any = animals.some(a => !a.ridden && a.x<54), lab = '';   // 따라가기는 '나타났어요' 알림을 눌러서 시작한다
     if (lab!==followLabel){ followLabel = lab; $('bFollow').hidden = !lab; if (lab) $('bFollow').textContent = lab; $('bFollow').setAttribute('aria-pressed', !!follow); } }
   nearRabbit = null; if (!riding && !petting && seated<0 && !lying){ let best = 2.2; for (const a of animals){ if (a.deer) continue; const d = Math.hypot(a.x-cam.x,a.z-cam.z); if (d<best){ best = d; nearRabbit = a; } } }
   if (petting){ const a = petting.a; cam.head = Math.atan2(a.x-cam.x,-(a.z-cam.z)); }
