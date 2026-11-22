@@ -1137,17 +1137,66 @@ function spawnAnimal(kind){
     const way = []; const k = 2+Math.floor(Math.random()*2);
     for(let j=0;j<k;j++) way.push([-30+Math.random()*55+i*2, -44+Math.random()*88]);
     way.push([48, -22+Math.random()*44], [60, -40+Math.random()*20]);
-    animals.push({deer, x:50+i*2, z:z0+i*1.5, h:-1.57, ph:Math.random()*6, way, wait:0, flee:false, v:0});
+    animals.push({id:Math.random().toString(36).slice(2,10), deer, x:50+i*2, z:z0+i*1.5, h:-1.57, ph:Math.random()*6, way, wait:0, flee:false, v:0});
   }
   toast(deer ? '고라니가 나타났어요' : (n>1 ? '토끼 두 마리가 운동장에 들어왔어요' : '토끼 한 마리가 운동장에 들어왔어요'), animals[first]);
 }
+/* 함께 걷기 중에는 접속자 중 한 명(대표)의 화면이 동물을 움직이고, 다른 사람은 그 상태를 받아 보여 준다 */
+const netOn = () => !!(window.MP && window.MP.ok && window.MP.worldOk!==false);
+let wasLeader = false, animalsSynced = false;
+const r1 = v => Math.round(v*10)/10;
+function releaseDeer(a){ a.ridden = false; a.v = 0; a.flee = false; a.wait = 1.2; a.way = [[48, clamp(a.z,-22,22)], [60, -40+Math.random()*20]]; }
+function animalFrom(o,keep){
+  const a = keep || {id:o.id, ph:Math.random()*6, x:o.x, z:o.z, h:o.h||0, way:[], wait:0, flee:false, v:0};
+  a.deer = !!o.d; a.tx = o.x; a.tz = o.z; a.th = o.h||0; a.tv = o.v||0; a.tr = !!o.r; a.tp = !!o.p;
+  if (o.w) a.way = o.w.map(q => [q[0],q[1]]); a.wait = o.t||0; a.flee = !!o.f; return a;
+}
+function syncAnimals(dt,MP){
+  const list = Array.isArray(MP.animals) ? MP.animals : Object.values(MP.animals||{}), ids = new Set(), k = 1-Math.exp(-dt*7);
+  let newDeer = null, newRabbits = [];
+  for (const o of list){ if (!o || !o.id) continue; ids.add(o.id);
+    let a = animals.find(q => q.id===o.id);
+    if (!a){ a = animalFrom(o); animals.push(a); if (animalsSynced){ if (a.deer) newDeer = newDeer||a; else newRabbits.push(a); } }
+    else animalFrom(o,a);
+  }
+  for (let i=animals.length-1;i>=0;i--) if (!ids.has(animals[i].id)){ if (riding===animals[i]) riding = null; animals.splice(i,1); }
+  for (const a of animals){
+    const ox = a.x, oz = a.z; a.x += (a.tx-a.x)*k; a.z += (a.tz-a.z)*k;
+    let dh = a.th-a.h; dh = Math.atan2(Math.sin(dh),Math.cos(dh)); a.h += dh*k;
+    const mv = Math.hypot(a.x-ox,a.z-oz); a.v = a.tv; a.ph += mv*(a.deer?1.5:2.8);
+    a.ridden = a.tr || riding===a;
+    if (a.tp && !(a.pet>0)) a.pet = 2.6; else if (a.pet>0) a.pet -= dt;
+  }
+  if (animalsSynced){
+    if (newDeer) toast('고라니가 나타났어요', newDeer);
+    else if (newRabbits.length) toast(newRabbits.length>1 ? '토끼 두 마리가 운동장에 들어왔어요' : '토끼 한 마리가 운동장에 들어왔어요', newRabbits[0]);
+  }
+  animalsSynced = true;
+}
 function stepAnimals(dt,time){
+  const net = netOn(), MP = window.MP;
+  if (net && !MP.ready()) return;                                  // 누가 함께 있는지 알 때까지 기다린다
+  if (net && !MP.leader()){ wasLeader = false; syncAnimals(dt,MP); return; }
+  if (net && !wasLeader){                                          // 대표가 되면 지금까지의 동물을 이어받는다
+    wasLeader = true; animalsSynced = true;
+    const list = Array.isArray(MP.animals) ? MP.animals : Object.values(MP.animals||{});
+    for (const o of list){ if (!o || !o.id) continue; const a = animals.find(q => q.id===o.id); if (a) animalFrom(o,a); else animals.push(animalFrom(o)); }
+    for (const a of animals){ a.x = a.tx??a.x; a.z = a.tz??a.z; a.h = a.th??a.h; }
+    nextAnimal = Math.max(nextAnimal, time+8);
+  }
   if (time>nextAnimal){ spawnAnimal(); nextAnimal = time + 22 + Math.random()*40; }
   for(let i=animals.length-1;i>=0;i--){
     const a = animals[i];
+    if (net){   // 다른 사람이 타거나 쓰다듬은 것을 반영한다
+      const act = (MP.acts||{})[a.id]||{}, rideBy = act.ride && (act.ride===MP.id || MP.peers.has(act.ride)) ? act.ride : null;
+      const want = riding===a || !!rideBy;
+      if (a.ridden && !want) releaseDeer(a);
+      a.ridden = want;
+      if (act.pet && act.pet!==a.petSeen){ a.petSeen = act.pet; if (act.by!==MP.id){ a.pet = 2.6; a.wait = Math.max(a.wait,3); } }
+    }
     if (a.ridden && a.way.length<3) a.way = [[-30+Math.random()*55,-44+Math.random()*88],[-30+Math.random()*55,-44+Math.random()*88],[-30+Math.random()*55,-44+Math.random()*88]].concat(a.way.slice(-2));
     const w2 = a.way[0];
-    if (!w2){ animals.splice(i,1); continue; }
+    if (!w2){ if (net) MP.clearAct(a.id); animals.splice(i,1); continue; }
     if (a.pet>0){ a.pet -= dt; a.wait = Math.max(a.wait,.8); }
     const near = !a.ridden && !(a.pet>0) && Math.hypot(a.x-cam.x,a.z-cam.z)<9 && keys.ShiftLeft && !riding && !follow;
     if (near && !a.flee){ a.flee = true; a.wait = 0; a.way = a.way.slice(-2); }
@@ -1157,6 +1206,8 @@ function stepAnimals(dt,time){
     const th = Math.atan2(dx,-dz); let dh = th-a.h; dh = Math.atan2(Math.sin(dh),Math.cos(dh)); a.h += dh*Math.min(1,dt*6);
     a.x += Math.sin(a.h)*sp*dt; a.z -= Math.cos(a.h)*sp*dt; a.v = sp; a.ph += dt*(a.deer?11:13)*(a.flee?1.3:1);
   }
+  if (net) MP.pubAnimals(animals.map(a => ({id:a.id, d:a.deer?1:0, x:r1(a.x), z:r1(a.z), h:Math.round(a.h*100)/100, v:a.wait>0&&!a.flee?0:r1(a.v),
+    p:a.pet>0?1:0, r:a.ridden?1:0, w:a.way.map(q => [r1(q[0]),r1(q[1])]), t:r1(Math.max(0,a.wait)), f:a.flee?1:0})));
 }
 function drawAnimal(m,a){
   const f=[Math.sin(a.h),-Math.cos(a.h)], r=[Math.cos(a.h),Math.sin(a.h)], moving = a.v>0;
@@ -1208,14 +1259,27 @@ function drawBirds(m,time){
 }
 /* ───────── 축구공 ───────── */
 const ball = {x:9, z:17, y:0, vx:0, vz:0, vy:0, goalT:0};
+let ballK = null;
 function stepBall(dt,dx,dz,sp,run){
-  if (ball.goalT>0){ ball.goalT -= dt; if (ball.goalT<=0){ ball.x = 0; ball.z = 0; ball.y = 0; ball.vx = ball.vz = ball.vy = 0; } }
-  const px = ball.x-cam.x, pz = ball.z-cam.z, d = Math.hypot(px,pz);
-  if (d<.5 && ball.y<.7 && !lying && seated<0 && !resting){
-    const l = Math.hypot(dx,dz), nx = d>.001 ? px/d : Math.sin(cam.head), nz = d>.001 ? pz/d : -Math.cos(cam.head);
-    if (sp>.1 && l>0){ const k = (run?15:9)*sp; ball.vx = (dx/l*.7+nx*.3)*k; ball.vz = (dz/l*.7+nz*.3)*k; ball.vy = run ? 4.5 : 2.2; if (ac && sndOn) tone(150,.1,.12); }
-    ball.x = cam.x+nx*.5; ball.z = cam.z+nz*.5;
+  const net = netOn(), MP = window.MP;
+  if (net && MP.ball && MP.ball.k!==ballK){   // 다른 사람이 찬 공: 찬 순간부터 지난 시간만큼 굴려 맞춘다
+    const b = MP.ball; ballK = b.k;
+    if (b.by!==MP.id){ ball.x = b.x; ball.z = b.z; ball.y = b.y||0; ball.vx = b.vx||0; ball.vz = b.vz||0; ball.vy = b.vy||0; ball.goalT = b.g||0;
+      let el = clamp((MP.now()-(b.t||MP.now()))/1000,0,8); while (el>1e-4){ const s1 = Math.min(el,1/60); ballPhys(s1,true); el -= s1; } }
   }
+  let kicked = false, pushed = false;
+  const px = ball.x-cam.x, pz = ball.z-cam.z, d = Math.hypot(px,pz);
+  if (d<.5 && ball.y<.7 && !lying && seated<0 && !resting && !riding){
+    const l = Math.hypot(dx,dz), nx = d>.001 ? px/d : Math.sin(cam.head), nz = d>.001 ? pz/d : -Math.cos(cam.head);
+    if (sp>.1 && l>0){ const k = (run?15:9)*sp; ball.vx = (dx/l*.7+nx*.3)*k; ball.vz = (dz/l*.7+nz*.3)*k; ball.vy = run ? 4.5 : 2.2; kicked = true; if (ac && sndOn) tone(150,.1,.12); }
+    ball.x = cam.x+nx*.5; ball.z = cam.z+nz*.5; pushed = true;
+  }
+  if (net && (kicked || pushed)){ ballK = Date.now()+'-'+MP.id;
+    MP.setBall({x:r1(ball.x), z:r1(ball.z), y:Math.round(ball.y*100)/100, vx:Math.round(ball.vx*100)/100, vz:Math.round(ball.vz*100)/100, vy:Math.round(ball.vy*100)/100, g:r1(ball.goalT), k:ballK}, kicked); }
+  ballPhys(dt,false);
+}
+function ballPhys(dt,quiet){
+  if (ball.goalT>0){ ball.goalT -= dt; if (ball.goalT<=0){ ball.x = 0; ball.z = 0; ball.y = 0; ball.vx = ball.vz = ball.vy = 0; } }
   ball.vy -= 9.8*dt; ball.x += ball.vx*dt; ball.z += ball.vz*dt; ball.y += ball.vy*dt;
   if (ball.y<0){ ball.y = 0; ball.vy = ball.vy<-1.2 ? -ball.vy*.5 : 0; }
   const fr = Math.exp(-dt*(ball.y<=.001 ? .8 : .1)); ball.vx *= fr; ball.vz *= fr;
@@ -1223,7 +1287,7 @@ function stepBall(dt,dx,dz,sp,run){
   if (ball.x<-37.6){ ball.x = -37.6; ball.vx = Math.abs(ball.vx)*.5; } if (ball.x>40.2){ ball.x = 40.2; ball.vx = -Math.abs(ball.vx)*.5; }
   const zMax = ball.goalT>0 ? 51.7 : 55.8;
   if (ball.z<-zMax){ ball.z = -zMax; ball.vz = Math.abs(ball.vz)*.3; } if (ball.z>zMax){ ball.z = zMax; ball.vz = -Math.abs(ball.vz)*.3; }
-  if (!(ball.goalT>0) && Math.abs(ball.z)>50.2 && Math.abs(ball.z)<52 && Math.abs(ball.x)<3.5 && ball.y<2.3){ ball.goalT = 2.8; ball.vx *= .25; ball.vz *= .25; toast('골!'); if (ac && sndOn) chime(); }
+  if (!(ball.goalT>0) && Math.abs(ball.z)>50.2 && Math.abs(ball.z)<52 && Math.abs(ball.x)<3.5 && ball.y<2.3){ ball.goalT = 2.8; ball.vx *= .25; ball.vz *= .25; if (!quiet){ toast('골!'); if (ac && sndOn) chime(); } }
 }
 /* ───────── 운동장 둘레 산책 (12~13시 남녀 둘, 23~24시 손전등 든 여자) ───────── */
 const LOOP = {x0:-35, x1:38.2, z0:-53.5, z1:53.5};
@@ -1287,7 +1351,7 @@ function drawPeers(m,dt,time,VP){
     if (p.w && p.w!==p._lastW){ p._lastW = p.w; if (p._seenW){ p.waveUntil = time+2.6; if (Math.hypot(p.x-cam.x,p.z-cam.z)<40) toast((p.n||'손님')+'님이 손을 흔들어요'); } }
     p._seenW = true;
     const gyp = groundY(p.rx,p.rz), pose = p.p|0, shirt = hex3((SHIRTS[p.s|0]||SHIRTS[0])[1]), waving = p.waveUntil>time;
-    if (pose===4) drawAnimal(m,{deer:true,x:p.rx,z:p.rz,h:p.rh,v:moving?7:0,ph:p.ph*3,ridden:true});
+    if (pose===4 && !netOn()) drawAnimal(m,{deer:true,x:p.rx,z:p.rz,h:p.rh,v:moving?7:0,ph:p.ph*3,ridden:true});
     person(m,p.rx,gyp+(pose===4?.58:0),p.rz,p.rh,p.ph,moving&&pose===0?1:0,shirt,
       {chair:pose===1,lie:pose===2,sit:pose===3,ride:pose===4,crouch:pose===5?time+.01:0,hat:p.c|0,
        umb:p.u===1?[.98,.82,.12]:p.u===2?[.86,.14,.13]:null,wave:waving&&pose===0?time:0});
@@ -1397,12 +1461,13 @@ $('bFollow').onclick = () => {
   let best = 1e9; for (const a of animals){ if (a.ridden) continue; const d = Math.hypot(a.x-cam.x,a.z-cam.z); if (d<best){ best = d; follow = a; } }
   firstTouch();
 };
-function petRabbit(a){ petting = {a, t:2.6}; a.pet = 2.6; a.wait = Math.max(a.wait,3); cam.head = Math.atan2(a.x-cam.x,-(a.z-cam.z)); if (sndOn){ tone(1568,.03,1.2); tone(2093,.025,1.4,.18); } firstTouch(); }
-function mountDeer(a){ standUp(); if (lying) setLie(false); riding = a; a.ridden = true; a.wait = 0; cam.x = a.x; cam.z = a.z; cam.head = a.h; toast('고라니에 올라탔어요'); if (sndOn) chime(); firstTouch(); }
+function petRabbit(a){ if (netOn()) window.MP.act(a.id,{pet:Date.now()}); petting = {a, t:2.6}; a.pet = 2.6; a.wait = Math.max(a.wait,3); cam.head = Math.atan2(a.x-cam.x,-(a.z-cam.z)); if (sndOn){ tone(1568,.03,1.2); tone(2093,.025,1.4,.18); } firstTouch(); }
+function mountDeer(a){ standUp(); if (lying) setLie(false); if (netOn()) window.MP.act(a.id,{ride:window.MP.id}); riding = a; a.ridden = true; a.wait = 0; cam.x = a.x; cam.z = a.z; cam.head = a.h; toast('고라니에 올라탔어요'); if (sndOn) chime(); firstTouch(); }
 function dismount(){
-  const a = riding; if (!a) return; riding = null; a.ridden = false; a.v = 0;
+  const a = riding; if (!a) return; riding = null;
   cam.x = clamp(a.x+Math.cos(a.h)*1.1,-38,54.8); cam.z = clamp(a.z+Math.sin(a.h)*1.1,-55.4,55.4);
-  a.flee = false; a.wait = 1.2; a.way = [[48, clamp(a.z,-22,22)], [60, -40+Math.random()*20]];   // 잠깐 서 있다가 숲으로 돌아간다
+  if (netOn()){ window.MP.act(a.id,{ride:null}); if (window.MP.leader()) releaseDeer(a); else a.ridden = false; }
+  else releaseDeer(a);   // 잠깐 서 있다가 숲으로 돌아간다
 }
 function setLie(on){ if (on){ standUp(); dismount(); } lying = on; $('bLie').setAttribute('aria-pressed', on); if (on) firstTouch(); }
 $('bLie').onclick = () => setLie(!lying);
@@ -1682,7 +1747,7 @@ function frame(now){
   }
   requestAnimationFrame(frame);
 }
-window.sansa = {me:() => [cam.x,cam.z],deer:() => spawnAnimal('deer'), rabbit:() => spawnAnimal('rabbit'), head:() => cam.head*180/Math.PI,walker:(off) => { const sec = seoulSec(Date.now()+previewH*36e5); return sec>=23*3600 ? loopAt((sec-23*3600)*1.1+LOOP.len/2+(off||0)) : loopAt((sec-(sec>=18*3600?18:12)*3600)*.9+(off||0)); },birds:() => birds.map(b => [b.x,b.y,b.z]),lie:() => setLie(true), bird:() => { nextBird = 0; }, ball:(x,z,vx,vz) => { ball.x = x; ball.z = z; ball.vx = vx||0; ball.vz = vz||0; },animal:() => { nextAnimal = 0; }, animals:() => animals.map(a => [a.deer,Math.round(a.x),Math.round(a.z),a.wait>0]), view:t => { third = t; },preview:h => { previewH = h; }, weather:k => { wxKey = k; cur.cover = WX[k].cover; cur.fog = WX[k].fog; cur.rain = WX[k].rain; cur.snow = WX[k].snow; cur.snowGround = WX[k].snow; },
+window.sansa = {ballPos:() => [Math.round(ball.x*10)/10,Math.round(ball.z*10)/10],me:() => [cam.x,cam.z],deer:() => spawnAnimal('deer'), rabbit:() => spawnAnimal('rabbit'), head:() => cam.head*180/Math.PI,walker:(off) => { const sec = seoulSec(Date.now()+previewH*36e5); return sec>=23*3600 ? loopAt((sec-23*3600)*1.1+LOOP.len/2+(off||0)) : loopAt((sec-(sec>=18*3600?18:12)*3600)*.9+(off||0)); },birds:() => birds.map(b => [b.x,b.y,b.z]),lie:() => setLie(true), bird:() => { nextBird = 0; }, ball:(x,z,vx,vz) => { ball.x = x; ball.z = z; ball.vx = vx||0; ball.vz = vz||0; },animal:() => { nextAnimal = 0; }, animals:() => animals.map(a => [a.deer,Math.round(a.x),Math.round(a.z),a.wait>0]), view:t => { third = t; },preview:h => { previewH = h; }, weather:k => { wxKey = k; cur.cover = WX[k].cover; cur.fog = WX[k].fog; cur.rain = WX[k].rain; cur.snow = WX[k].snow; cur.snowGround = WX[k].snow; },
   look:(x,z,yawDeg,pitch) => { cam.x = x; cam.z = z; cam.yaw = yawDeg*rad; cam.pitch = pitch||0; }, sun:() => sunPos(Date.now()+previewH*36e5).alt/rad};
 requestAnimationFrame(frame);
 })();
@@ -1699,21 +1764,39 @@ try {
   const db = D.getDatabase(initializeApp(cfg));
   const id = Math.random().toString(36).slice(2,12);
   const me = D.ref(db,'players/'+id); D.onDisconnect(me).remove();
-  const peers = new Map(); let offset = 0;
+  const peers = new Map(); let offset = 0, gotPlayers = false; const t0 = performance.now();
+  const MP = { ok:true, id, peers, worldOk:true, animals:null, ball:null, acts:{} };
+  const failWorld = e => { console.warn('동물·공 공유를 쓰지 못해 각자 화면에서 움직입니다:', e); MP.worldOk = false; };
   D.onValue(D.ref(db,'.info/serverTimeOffset'), s => { offset = s.val()||0; });
   D.onValue(D.ref(db,'players'), snap => {
-    const v = snap.val()||{}, now = Date.now()+offset, seen = new Set();
+    const v = snap.val()||{}, now = Date.now()+offset, seen = new Set(); gotPlayers = true;
     for (const k in v){ const p = v[k]; if (k===id || !p || typeof p.x!=='number' || now-(p.t||0)>45000) continue;
       seen.add(k); peers.set(k, Object.assign(peers.get(k)||{}, p)); }
     for (const k of [...peers.keys()]) if (!seen.has(k)) peers.delete(k);
   });
   setInterval(() => { const now = Date.now()+offset; for (const [k,p] of peers) if (now-(p.t||0)>45000) peers.delete(k); }, 10000);
+  // 동물과 공: world 아래에 둔다
+  D.onValue(D.ref(db,'world/animals'), s => { MP.animals = s.val()||[]; }, failWorld);
+  D.onValue(D.ref(db,'world/ball'), s => { MP.ball = s.val(); }, failWorld);
+  D.onValue(D.ref(db,'world/acts'), s => { MP.acts = s.val()||{}; }, failWorld);
+  MP.now = () => Date.now()+offset;
+  MP.ready = () => gotPlayers && performance.now()-t0 > 2500;
+  MP.leader = () => { for (const k of peers.keys()) if (k<id) return false; return true; };   // 아이디가 가장 작은 사람이 대표
+  let lastA = 0, lastAJ = '';
+  MP.pubAnimals = list => { const n = performance.now(); if (n-lastA<250) return; const j = JSON.stringify(list); if (j===lastAJ && n-lastA<3000) return;
+    lastA = n; lastAJ = j; D.set(D.ref(db,'world/animals'), list).catch(failWorld); };
+  let lastB = 0;
+  MP.setBall = (st,force) => { const n = performance.now(); if (!force && n-lastB<150) return; lastB = n;
+    D.set(D.ref(db,'world/ball'), Object.assign({}, st, {by:id, t:D.serverTimestamp()})).catch(failWorld); };
+  MP.act = (aid,obj) => D.update(D.ref(db,'world/acts/'+aid), Object.assign({}, obj, {by:id})).catch(failWorld);
+  MP.clearAct = aid => D.remove(D.ref(db,'world/acts/'+aid)).catch(() => {});
   let last = 0, lastJson = '', lastBeat = 0;
-  window.MP = { ok:true, id, peers, send(st){
+  MP.send = st => {
     const now = performance.now(); if (now-last<200) return;
     const j = JSON.stringify(st); if (j===lastJson && now-lastBeat<15000) return;
     last = now; lastJson = j; lastBeat = now; D.set(me, Object.assign({}, st, {t:D.serverTimestamp()})).catch(e => console.warn('함께 걷기 저장 실패', e));
-  } };
+  };
+  window.MP = MP;
   addEventListener('pagehide', () => { D.remove(me); });
 } catch(e){ console.warn('함께 걷기에 연결하지 못해 혼자 걷기로 둡니다:', e); }
 </script>
