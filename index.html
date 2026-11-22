@@ -79,6 +79,16 @@ body.mp .toast{top:168px}
   display:flex;flex-direction:column;gap:10px;max-height:calc(100% - 24px);overflow-y:auto}
 .sheet>*{flex-shrink:0}
 .sheet[hidden]{display:none}
+.gblist{display:flex;flex-direction:column;gap:8px;max-height:46vh;overflow-y:auto}
+.gbitem{padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.06)}
+.gbitem b{font-size:13px;color:var(--jade)}
+.gbitem time{font-size:11px;color:var(--muted);margin-left:8px}
+.gbitem p{font-size:14px;line-height:1.5;margin-top:4px;white-space:pre-wrap;word-break:break-word}
+.gbempty{font-size:13px;color:var(--muted);padding:8px 0}
+.gb textarea{width:100%;resize:none;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.06);color:inherit;font:inherit;font-size:16px}
+.gbrow{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--muted)}
+.gbrow button{height:40px;padding:0 18px;border-radius:20px;border:0;background:var(--jade);color:#10201b;font-size:14px;font-weight:700}
+.gbrow button:disabled{opacity:.5}
 .sheet h2{font-family:var(--display);font-size:16px;font-weight:700}
 .sheet .row{display:flex;flex-wrap:wrap;gap:8px}
 .chip{height:40px;padding:0 14px;border-radius:20px;border:1px solid var(--line);background:transparent;font-size:14px}
@@ -164,6 +174,14 @@ body.mp .toast{top:168px}
   <input type="range" id="tslide" min="0" max="24" step="0.25" value="0">
   <p class="note">낮과 밤, 해와 달의 자리는 제천의 지금 시각을 그대로 따릅니다. <span id="wxnote">날씨는 11월 18일 저녁 제천 관측값(비, 4도)입니다.</span> 다른 날씨를 고르면 그 날씨로 바뀌고, 「실시간」을 누르면 되돌아갑니다. 계절은 날짜를 따라 바뀌며(봄 벚꽃, 여름 녹음, 가을 단풍, 겨울 눈) 여기서 미리 볼 수도 있습니다. 테니스장 조명은 저녁 7시부터 10시까지 켜집니다. 맑은 밤에는 은하수가 보입니다.</p>
   <button class="close" id="bClose" type="button">닫기</button>
+</section>
+
+<section class="sheet gb" id="gbook" hidden>
+  <h2>방명록</h2>
+  <div class="gblist" id="gblist"></div>
+  <textarea id="gbmsg" maxlength="120" rows="2" placeholder="한마디 남겨 주세요 (120자까지)"></textarea>
+  <div class="gbrow"><span id="gbcnt">0/120</span><button id="gbsend" type="button">남기기</button></div>
+  <button class="close" id="gbClose" type="button">닫기</button>
 </section>
 
 <div class="rest" id="rest" hidden>
@@ -396,6 +414,12 @@ function fence(x0,z0,x1,z1,h,y0){
   FENCE.quad([x0,y0,z0],[x1,y0,z1],[x1,y0+h,z1],[x0,y0+h,z0],WHITE,[[0,0],[len/1.2,0],[len/1.2,h/1.2],[0,h/1.2]]);
 }
 fence(-38,-56.6,41,-56.6,7,0); fence(-38,56.6,41,56.6,7,0);
+// 방명록 게시판: 남쪽 철망에 붙여 운동장 쪽을 본다
+const GB_AT = [-13.5,55.5], BOARD = new Mesh();
+for (const sx of [-1.65,1.65]) P.box(GB_AT[0]+sx,0,GB_AT[1]+.12,.14,3,.14,C.wood);
+P.box(GB_AT[0],.82,GB_AT[1]+.16,3.3,1.96,.1,C.wood);
+P.box(GB_AT[0],2.9,GB_AT[1]+.05,3.7,.12,.6,[.18,.14,.12]);
+BOARD.quad([GB_AT[0]+1.55,.9,GB_AT[1]+.1],[GB_AT[0]-1.55,.9,GB_AT[1]+.1],[GB_AT[0]-1.55,2.7,GB_AT[1]+.1],[GB_AT[0]+1.55,2.7,GB_AT[1]+.1],[1,1,1],[[0,0],[1,0],[1,1],[0,1]]);
 
 /* 퍼걸러 쉼터, 정자, 장독 */
 function pergola(zc){
@@ -772,7 +796,16 @@ function meshTex(stroke,lw){
 }
 { const e=cv(64,64), y=e.getContext('2d'); const g=y.createLinearGradient(0,0,0,64); g.addColorStop(0,'#ffdca4'); g.addColorStop(1,'#e9b46c');
   y.fillStyle=g; y.fillRect(0,0,64,64); y.fillStyle='#2a2420'; y.fillRect(0,0,3,64); y.fillRect(31,0,2,64); T.lobbyE = tex(e,true); }
-T.fence = meshTex('rgba(70,170,105,.95)',5); T.net = meshTex('rgba(245,245,240,.9)',4);
+T.fence = meshTex('rgba(70,170,105,.95)',5);
+{ // 방명록 게시판 그림: 코르크판에 쪽지들
+  const c = cv(1024,512), x = c.getContext('2d'); x.fillStyle = '#b8875a'; x.fillRect(0,0,1024,512);
+  for (let i=0;i<5000;i++){ x.fillStyle = rnd()<.5 ? 'rgba(90,50,20,.18)' : 'rgba(255,230,190,.14)'; x.fillRect(rnd()*1024,rnd()*512,3,3); }
+  x.fillStyle = '#f4efe2'; x.fillRect(332,26,360,104); x.fillStyle = '#2b3a36'; x.font = 'bold 72px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('방명록',512,80);
+  const notes = [['#fff4a8',70,60,-.08],['#ffd0dc',800,52,.07],['#cfe8ff',96,250,.05],['#d8f5c8',300,190,-.04],['#fff4a8',520,200,.06],['#ffd0dc',740,250,-.06],['#cfe8ff',420,330,-.03],['#fff',870,330,.08],['#d8f5c8',150,380,-.07]];
+  for (const [col,nx,ny,r] of notes){ x.save(); x.translate(nx+70,ny+60); x.rotate(r); x.fillStyle = 'rgba(0,0,0,.18)'; x.fillRect(-66,-54,140,120); x.fillStyle = col; x.fillRect(-70,-60,140,120);
+    x.fillStyle = 'rgba(60,60,80,.55)'; for (let l=0;l<4;l++) x.fillRect(-54,-34+l*24,90+rnd()*20-(l===3?40:0),5); x.fillStyle = '#c0392b'; x.beginPath(); x.arc(0,-50,7,0,6.283); x.fill(); x.restore(); }
+  x.fillStyle = '#f4efe2'; x.font = '30px sans-serif'; x.fillText('가까이 와서 한마디 남겨 주세요',512,478);
+  T.board = tex(c,false); } T.net = meshTex('rgba(245,245,240,.9)',4);
 
 /* ───────── 셰이더 ───────── */
 const PREC = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n';
@@ -852,7 +885,7 @@ const FLAT = prog(
 /* ───────── 버퍼 ───────── */
 function vbo(data,dyn){ const b=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,b); gl.bufferData(gl.ARRAY_BUFFER,data,dyn?gl.DYNAMIC_DRAW:gl.STATIC_DRAW); return b; }
 const mk = m => ({b:vbo(new Float32Array(m.a)), n:m.a.length/11});
-const B = {props:mk(P), field:mk(FIELD), court:mk(COURT), tennis:mk(TENNIS), facade:mk(FACADE), dorm:mk(DORM), fence:mk(FENCE), net:mk(NET), lobby:mk(LOBBY), sock:mk(SOCK), main:mk(MAIN), mainLobby:mk(MAINLOBBY), nf:[mk(NF_P),mk(NF_D),mk(NF_L)], sf:[mk(SF_P),mk(SF_D),mk(SF_L)]};
+const B = {board:mk(BOARD), props:mk(P), field:mk(FIELD), court:mk(COURT), tennis:mk(TENNIS), facade:mk(FACADE), dorm:mk(DORM), fence:mk(FENCE), net:mk(NET), lobby:mk(LOBBY), sock:mk(SOCK), main:mk(MAIN), mainLobby:mk(MAINLOBBY), nf:[mk(NF_P),mk(NF_D),mk(NF_L)], sf:[mk(SF_P),mk(SF_D),mk(SF_L)]};
 const terrB = vbo(terr.a), terrI = gl.createBuffer();
 gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,terrI); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,terr.idx,gl.STATIC_DRAW);
 const gondB = vbo(new Float32Array(10*30*11),true);
@@ -1579,6 +1612,39 @@ syncWx(); liveWeather(); setInterval(liveWeather, 15*60*1000);
   b.onclick = () => { try { localStorage.setItem('cp-season',v[0]); } catch(e){} location.hash = v[0]||'auto'; location.reload(); }; $('seasons').appendChild(b); });
 $('bWx').onclick = () => { $('sheet').hidden = !$('sheet').hidden; };
 $('bClose').onclick = () => { $('sheet').hidden = true; };
+/* ───────── 방명록 ───────── */
+let gbOff = null, gbLast = 0;
+function gbRender(list){
+  const el = $('gblist'); el.textContent = '';
+  const msg = t => { const p = document.createElement('p'); p.className = 'gbempty'; p.textContent = t; el.appendChild(p); };
+  if (list===null) return msg('방명록을 불러오지 못했어요. 잠시 뒤 다시 열어 주세요.');
+  if (!list.length) return msg('아직 남긴 글이 없어요. 첫 글을 남겨 주세요.');
+  list.sort((a,b) => (b.t||0)-(a.t||0)).forEach(e => {
+    const d = document.createElement('div'); d.className = 'gbitem';
+    const h = document.createElement('div'), b = document.createElement('b'), tm = document.createElement('time'), p = document.createElement('p');
+    b.textContent = String(e.n||'손님').slice(0,10);
+    const dt = new Date((e.t||0)+9*3600e3); tm.textContent = e.t ? (dt.getUTCMonth()+1)+'월 '+dt.getUTCDate()+'일 '+String(dt.getUTCHours()).padStart(2,'0')+':'+String(dt.getUTCMinutes()).padStart(2,'0') : '';
+    p.textContent = String(e.m||'').slice(0,120); h.append(b,tm); d.append(h,p); el.appendChild(d);
+  });
+}
+function openGB(){
+  const MP = window.MP; $('gbook').hidden = false; $('sheet').hidden = true; move.x = move.y = 0; firstTouch();
+  $('gblist').textContent = ''; const p = document.createElement('p'); p.className = 'gbempty';
+  if (MP && MP.ok && !MP.offline && MP.gbWatch){ p.textContent = '불러오는 중이에요'; $('gblist').appendChild(p); if (gbOff) gbOff(); gbOff = MP.gbWatch(gbRender); }
+  else { p.textContent = '지금은 연결되어 있지 않아 방명록을 볼 수 없어요. 함께 걷기에 들어온 뒤 다시 열어 주세요.'; $('gblist').appendChild(p); }
+}
+function closeGB(){ $('gbook').hidden = true; if (gbOff){ gbOff(); gbOff = null; } }
+$('gbClose').onclick = closeGB;
+$('gbmsg').addEventListener('keydown', e => e.stopPropagation());
+$('gbmsg').addEventListener('input', () => { $('gbcnt').textContent = $('gbmsg').value.length+'/120'; });
+$('gbsend').onclick = () => {
+  const MP = window.MP, m = $('gbmsg').value.trim().slice(0,120);
+  if (!m) return; if (!(MP && MP.ok && !MP.offline && MP.gbAdd)){ toast('연결되어 있지 않아 남기지 못했어요'); return; }
+  const now = performance.now(); if (now-gbLast<20000){ toast('잠시 뒤에 다시 남겨 주세요'); return; }
+  gbLast = now; $('gbsend').disabled = true;
+  MP.gbAdd(String(nick).slice(0,10), m).then(() => { $('gbmsg').value = ''; $('gbcnt').textContent = '0/120'; $('gblist').scrollTop = 0; if (sndOn) chime(); })
+    .catch(() => { gbLast = 0; toast('남기지 못했어요. 잠시 뒤 다시 해 주세요'); }).finally(() => { $('gbsend').disabled = false; });
+};
 $('tslide').oninput = e => {
   previewH = +e.target.value;
   $('tlabel').textContent = previewH===0 ? '지금' : fmtClock.format(new Date(Date.now()+previewH*36e5)) + ' (' + previewH + '시간 뒤)';
@@ -1618,7 +1684,7 @@ $('bSnd').onclick = () => setSound(!sndOn);
 /* ───────── 쉬기 ───────── */
 let umbCol = null;
 let resting = false, restT0 = 0, seated = -1, nearBench = -1, sitLabel = '', lying = false;
-let nearTomato = false, eating = null, heartT = -99;
+let nearTomato = false, eating = null, heartT = -99, nearBoard = false;
 function eatTomato(){
   const now = performance.now()/1000, ready = TOMATO.fruits.map((f,i) => i).filter(i => now-TOMATO.eaten[i]>90 && !TOMATO.fruits[i][3]);
   const pick = (ready.length ? ready : TOMATO.fruits.map((f,i) => i).filter(i => now-TOMATO.eaten[i]>90))[0];
@@ -1689,7 +1755,7 @@ function pickSide(b){
   return (window.MP.id > o.id) ? 1 : -1;   // 둘 다 가운데면 아이디로 나눈다
 }
 function standUp(){ if (seated<0) return; const b = BENCHES[seated], q = seatAt(b,seatSide); cam.x = q[0]+Math.sin(b.h)*.55; cam.z = q[1]-Math.cos(b.h)*.55; seated = -1; }
-$('bSit').onclick = () => { if (riding) dismount(); else if (lying) setLie(false); else if (seated>=0) standUp(); else if (nearDeer) mountDeer(nearDeer); else if (nearRabbit) petRabbit(nearRabbit); else if (nearTomato) eatTomato(); else if (nearBench>=0){ const b0 = BENCHES[nearBench]; if (!freeSeat(b0)) return; const side = pickSide(b0); seated = nearBench; seatSide = side; const b = b0, q = seatAt(b,side); cam.x = q[0]; cam.z = q[1]; cam.head = b.h; if (sndOn) chime(); firstTouch(); } };
+$('bSit').onclick = () => { if (riding) dismount(); else if (lying) setLie(false); else if (seated>=0) standUp(); else if (nearBoard) openGB(); else if (nearDeer) mountDeer(nearDeer); else if (nearRabbit) petRabbit(nearRabbit); else if (nearTomato) eatTomato(); else if (nearBench>=0){ const b0 = BENCHES[nearBench]; if (!freeSeat(b0)) return; const side = pickSide(b0); seated = nearBench; seatSide = side; const b = b0, q = seatAt(b,side); cam.x = q[0]; cam.z = q[1]; cam.head = b.h; if (sndOn) chime(); firstTouch(); } };
 function setRest(on){
   if (on){ standUp(); setLie(false); dismount(); }
   resting = on; $('rest').hidden = !on; restT0 = performance.now();
@@ -1795,10 +1861,11 @@ function frame(now){
     if (lab!==followLabel){ followLabel = lab; $('bFollow').hidden = !lab; if (lab) $('bFollow').textContent = lab; $('bFollow').setAttribute('aria-pressed', !!follow); } }
   nearRabbit = null; if (!riding && !petting && seated<0 && !lying){ let best = 2.2; for (const a of animals){ if (a.deer) continue; const d = Math.hypot(a.x-cam.x,a.z-cam.z); if (d<best){ best = d; nearRabbit = a; } } }
   if (petting){ const a = petting.a; cam.head = Math.atan2(a.x-cam.x,-(a.z-cam.z)); }
+  nearBoard = !riding && !petting && !eating && seated<0 && !lying && !resting && $('gbook').hidden && Math.abs(cam.x-GB_AT[0])<3 && GB_AT[1]-cam.z<3.4;
   nearTomato = !riding && !petting && !eating && seated<0 && !lying && !resting && Math.hypot(cam.x-TOMATO.x,cam.z-TOMATO.z)<2.8 && TOMATO.eaten.some(t => performance.now()/1000-t>90);
   if (eating){ eating.t -= dt; if (eating.t<=0) eating = null; }
   nearBench = -1; if (seated<0){ let best = 2.4*2.4; BENCHES.forEach((b,i) => { const d = (b.x-cam.x)**2+(b.z-cam.z)**2; if (d<best && freeSeat(b)){ best = d; nearBench = i; } }); }
-  { const lab = resting ? '' : riding ? '내리기' : (seated>=0 || lying) ? '일어나기' : petting ? '' : nearDeer ? '고라니 타기' : nearTomato && !eating ? '방울토마토 먹기' : nearRabbit ? (nearRabbit.cat ? '르샤 쓰다듬기' : '토끼 쓰다듬기') : nearBench>=0 ? '벤치에 앉기' : '';
+  { const lab = resting ? '' : riding ? '내리기' : (seated>=0 || lying) ? '일어나기' : petting ? '' : nearBoard ? '방명록 보기' : nearDeer ? '고라니 타기' : nearTomato && !eating ? '방울토마토 먹기' : nearRabbit ? (nearRabbit.cat ? '르샤 쓰다듬기' : '토끼 쓰다듬기') : nearBench>=0 ? '벤치에 앉기' : '';
     if (lab!==sitLabel){ sitLabel = lab; $('bSit').hidden = !lab; if (lab) $('bSit').textContent = lab; $('bSit').classList.toggle('quiet', lab==='일어나기'); } }
   const gy = groundY(cam.x,cam.z);
   if (sp>.08){ let dh = Math.atan2(vx,-vz)-cam.head; dh = Math.atan2(Math.sin(dh),Math.cos(dh)); cam.head += dh*Math.min(1,dt*9); }
@@ -1852,7 +1919,7 @@ function frame(now){
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,T.white); gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,T.black);
   gl.uniformMatrix4fv(LIT.u.uM,false,IDENT); bindLit(terrB); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,terrI);
   gl.drawElements(gl.TRIANGLES,terr.idx.length,gl.UNSIGNED_SHORT,0);
-  drawLit(B.props); drawLit(B.field,T.field); drawLit(B.court,T.court); drawLit(B.tennis,T.tennis);
+  drawLit(B.props); drawLit(B.board,T.board); drawLit(B.field,T.field); drawLit(B.court,T.court); drawLit(B.tennis,T.tennis);
   // 본관 조명은 밤 11시에 꺼지고 다음 날 저녁에 다시 켜진다. 가로등은 밤새 켜져 있다
   // 흐리거나 비·눈이 오는 날은 낮에도 본관 불을 켠다
   const bkSec = seoulSec(ms), bkOn = bkSec>=23*3600 || bkSec<6*3600 ? 0 : 1, bkLight = Math.max(env.night, .75*sstep(.6,.85,cur.cover))*bkOn;
@@ -2019,6 +2086,8 @@ try {
   let lastB = 0;
   MP.setBall = (st,force) => { const n = performance.now(); if (MP.offline || (!force && n-lastB<400)) return; lastB = n;
     D.set(D.ref(db,'world/ball'), Object.assign({}, st, {by:id, t:D.serverTimestamp()})).catch(failWorld); };
+  MP.gbWatch = cb => D.onValue(D.query(D.ref(db,'guestbook'), D.limitToLast(50)), s => { const v = s.val()||{}; cb(Object.keys(v).map(k => Object.assign({k}, v[k]))); }, () => cb(null));
+  MP.gbAdd = (n,m) => D.push(D.ref(db,'guestbook'), {n, m, t:D.serverTimestamp()});
   MP.act = (aid,obj) => D.update(D.ref(db,'world/acts/'+aid), Object.assign({}, obj, {by:id})).catch(failWorld);
   MP.clearAct = aid => D.remove(D.ref(db,'world/acts/'+aid)).catch(() => {});
   // 내 상태: 0.5초마다, 바뀐 값만 보낸다. 15초마다 살아 있다는 신호만 보낸다
