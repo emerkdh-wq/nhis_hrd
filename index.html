@@ -1573,7 +1573,7 @@ function drawPeers(m,dt,time,VP){
     const gyp = groundY(p.rx,p.rz), pose = p.p|0;
     if (pose===6 && p._pose!==6) p.heartAt = time+.3; p._pose = pose; drawHearts(m,p.rx,gyp,p.rz,time-(p.heartAt||-99));
     const shirt = hex3((SHIRTS[p.s|0]||SHIRTS[0])[1]), waving = p.waveUntil>time;
-    if (pose===4 && !netOn()) drawAnimal(m,{deer:true,x:p.rx,z:p.rz,h:p.rh,v:moving?7:0,ph:p.ph*3,ridden:true});
+    if (pose===4) drawAnimal(m,{deer:true,x:p.rx,z:p.rz,h:p.rh,v:moving?7:0,ph:p.ph*3,ridden:true});
     person(m,p.rx,gyp+(pose===4?.58:0),p.rz,p.rh,p.ph,moving&&pose===0?1:0,shirt,
       {chair:pose===1,lie:pose===2,sit:pose===3,ride:pose===4,crouch:pose===5?time+.01:0,eat:pose===6?time+.01:0,hat:p.c|0,
        umb:p.u===1?[.98,.82,.12]:p.u===2?[.86,.14,.13]:null,wave:waving&&pose===0?time:0});
@@ -2019,7 +2019,7 @@ function frame(now){
     if (riding){ cam.x = riding.x; cam.z = riding.z; cam.head = riding.h; }
     person(gm,cam.x,gy+(riding ? .58+rb : 0),cam.z,cam.head,walk,riding?0:sp,hex3(SHIRTS[shirtI][1]),{sit:resting,chair:seated>=0,lie:lying,ride:!!riding,eat:eating?time+.01:0,crouch:petting?time+.01:0,hat:hatI,umb:cur.rain>.3&&!riding?umbCol:null,wave:time-myWave<2.6&&myPose()===0?time:0}); }
   drawPeers(gm,dt,time,VP);
-  for(const a of animals) drawAnimal(gm,a);
+  for(const a of animals) if (!(a.ridden && riding!==a)) drawAnimal(gm,a);   // 다른 사람이 탄 고라니는 그 사람 아래에 함께 그린다(따로 그리면 늦게 따라오는 것처럼 보인다)
   { const now = performance.now()/1000;
     if (netOn()){ const ta = (window.MP.acts||{}).tomato, sn = window.MP.now();   // 다른 사람이 먹은 열매
       if (ta) for (const k in ta){ if (k[0]!=='f') continue; const i = +k.slice(1), t = now-(sn-ta[k])/1000; if (i>=0 && i<TOMATO.eaten.length && t>TOMATO.eaten[i]) TOMATO.eaten[i] = t; } }
