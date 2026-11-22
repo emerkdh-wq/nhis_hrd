@@ -702,7 +702,8 @@ const T = {white:solid('#fff'), black:solid('#000')};
   for(const s of [-1,1]){
     x.strokeRect(-20.15,s>0?33.5:-50,40.3,16.5); x.strokeRect(-9.15,s>0?44.5:-50,18.3,5.5);
     x.beginPath(); x.arc(0,s*39,.25,0,6.2832); x.fill();
-    x.beginPath(); if(s>0) x.arc(0,39,9.15,Math.PI+.93,-.93); else x.arc(0,-39,9.15,.93,Math.PI-.93); x.stroke();
+    const aD = Math.asin(5.5/9.15);   // 반원이 페널티박스 선과 정확히 만나는 각도
+    x.beginPath(); if(s>0) x.arc(0,39,9.15,Math.PI+aD,-aD); else x.arc(0,-39,9.15,aD,Math.PI-aD); x.stroke();
   }
   x.setTransform(1,0,0,1,0,0);
   for(let i=0;i<26000;i++){ x.fillStyle = rnd()<.5 ? 'rgba(0,30,0,.06)' : 'rgba(255,255,160,.05)'; x.fillRect(rnd()*1024,rnd()*2048,2,3); }
