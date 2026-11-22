@@ -1813,7 +1813,7 @@ function dismount(){
   if (netOn()){ window.MP.act(a.id,{ride:null}); if (window.MP.leader()) releaseDeer(a); else a.ridden = false; }
   else releaseDeer(a);   // 잠깐 서 있다가 숲으로 돌아간다
 }
-function setLie(on){ if (on){ standUp(); dismount(); } lying = on; $('bLie').setAttribute('aria-pressed', on); if (on) firstTouch(); }
+function setLie(on){ if (on){ standUp(); dismount(); follow = null; petting = null; } lying = on; $('bLie').setAttribute('aria-pressed', on); if (on) firstTouch(); }
 $('bLie').onclick = () => setLie(!lying);
 // 벤치 한 개에는 두 자리(왼쪽·오른쪽)만 있다. 다른 사람이 앉은 자리는 비어 있지 않다
 let seatSide = 0;
@@ -1917,7 +1917,7 @@ function frame(now){
   let followRun = false;
   if (follow){
     const a = follow, dx = a.x-cam.x, dz = a.z-cam.z, d = Math.hypot(dx,dz);
-    if (!animals.includes(a) || a.ridden || riding || resting || Math.hypot(mx,my)>.35 || a.x>54) follow = null;
+    if (!animals.includes(a) || a.ridden || riding || resting || lying || seated>=0 || Math.hypot(mx,my)>.35 || a.x>54) follow = null;
     else if (d>1.6){   // 동물 쪽으로 몸을 돌려 앞으로 달린다
       const want = Math.atan2(dx,-dz); let dh = want-cam.yaw; dh = Math.atan2(Math.sin(dh),Math.cos(dh)); cam.yaw += dh*Math.min(1,dt*4);
       const k = Math.min(1,(d-1.6)/1.5), rel = want-cam.yaw; mx = Math.sin(rel)*k; my = Math.cos(rel)*k; followRun = d>2.2;
