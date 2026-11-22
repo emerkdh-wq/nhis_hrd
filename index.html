@@ -1471,8 +1471,17 @@ function dismount(){
 }
 function setLie(on){ if (on){ standUp(); dismount(); } lying = on; $('bLie').setAttribute('aria-pressed', on); if (on) firstTouch(); }
 $('bLie').onclick = () => setLie(!lying);
-function standUp(){ if (seated<0) return; const b = BENCHES[seated]; cam.x = b.x+Math.sin(b.h)*.55; cam.z = b.z-Math.cos(b.h)*.55; seated = -1; }
-$('bSit').onclick = () => { if (riding) dismount(); else if (lying) setLie(false); else if (seated>=0) standUp(); else if (nearDeer) mountDeer(nearDeer); else if (nearRabbit) petRabbit(nearRabbit); else if (nearBench>=0){ seated = nearBench; const b = BENCHES[seated]; cam.x = b.x; cam.z = b.z; cam.head = b.h; if (sndOn) chime(); firstTouch(); } };
+// 벤치 한 개에는 두 자리(왼쪽·오른쪽)만 있다. 다른 사람이 앉은 자리는 비어 있지 않다
+let seatSide = 0;
+const seatAt = (b,side) => [b.x+Math.cos(b.h)*side*.42, b.z+Math.sin(b.h)*side*.42];
+function freeSeat(b){
+  const peers = window.MP && window.MP.ok ? [...window.MP.peers.values()] : [];
+  for (const side of [-1,1]){ const q = seatAt(b,side);
+    if (!peers.some(p => (p.p|0)===1 && Math.hypot(p.x-q[0],p.z-q[1])<.35)) return side; }
+  return 0;
+}
+function standUp(){ if (seated<0) return; const b = BENCHES[seated], q = seatAt(b,seatSide); cam.x = q[0]+Math.sin(b.h)*.55; cam.z = q[1]-Math.cos(b.h)*.55; seated = -1; }
+$('bSit').onclick = () => { if (riding) dismount(); else if (lying) setLie(false); else if (seated>=0) standUp(); else if (nearDeer) mountDeer(nearDeer); else if (nearRabbit) petRabbit(nearRabbit); else if (nearBench>=0){ const b0 = BENCHES[nearBench], side = freeSeat(b0); if (!side) return; seated = nearBench; seatSide = side; const b = b0, q = seatAt(b,side); cam.x = q[0]; cam.z = q[1]; cam.head = b.h; if (sndOn) chime(); firstTouch(); } };
 function setRest(on){
   if (on){ standUp(); setLie(false); dismount(); }
   resting = on; $('rest').hidden = !on; restT0 = performance.now();
@@ -1568,7 +1577,7 @@ function frame(now){
   const vx = Math.sin(cam.yaw)*my + Math.cos(cam.yaw)*mx, vz = -Math.cos(cam.yaw)*my + Math.sin(cam.yaw)*mx;
   const nx = clamp(cam.x + vx*v, -38, 54.8), nz = clamp(cam.z + vz*v, -55.4, 55.4);
   if (!blocked(nx,cam.z)) cam.x = nx; if (!blocked(cam.x,nz)) cam.z = nz;
-  if (seated>=0){ const b = BENCHES[seated]; cam.x = b.x+Math.sin(b.h)*.04; cam.z = b.z-Math.cos(b.h)*.04; cam.head = b.h; }
+  if (seated>=0){ const b = BENCHES[seated], q = seatAt(b,seatSide); cam.x = q[0]+Math.sin(b.h)*.04; cam.z = q[1]-Math.cos(b.h)*.04; cam.head = b.h; }
   if (riding){ cam.x = riding.x; cam.z = riding.z; cam.head = riding.h; }
   nearDeer = null; if (!riding && seated<0 && !lying){ let best = 3.2; for (const a of animals){ if (!a.deer) continue; const d = Math.hypot(a.x-cam.x,a.z-cam.z); if (d<best){ best = d; nearDeer = a; } } }
   { const wv = !!(window.MP && window.MP.ok) && myPose()===0; if ($('bWave').hidden===wv) $('bWave').hidden = !wv; }
@@ -1576,7 +1585,7 @@ function frame(now){
     if (lab!==followLabel){ followLabel = lab; $('bFollow').hidden = !lab; if (lab) $('bFollow').textContent = lab; $('bFollow').setAttribute('aria-pressed', !!follow); } }
   nearRabbit = null; if (!riding && !petting && seated<0 && !lying){ let best = 2.2; for (const a of animals){ if (a.deer) continue; const d = Math.hypot(a.x-cam.x,a.z-cam.z); if (d<best){ best = d; nearRabbit = a; } } }
   if (petting){ const a = petting.a; cam.head = Math.atan2(a.x-cam.x,-(a.z-cam.z)); }
-  nearBench = -1; { let best = 2.4*2.4; BENCHES.forEach((b,i) => { const d = (b.x-cam.x)**2+(b.z-cam.z)**2; if (d<best){ best = d; nearBench = i; } }); }
+  nearBench = -1; if (seated<0){ let best = 2.4*2.4; BENCHES.forEach((b,i) => { const d = (b.x-cam.x)**2+(b.z-cam.z)**2; if (d<best && freeSeat(b)){ best = d; nearBench = i; } }); }
   { const lab = resting ? '' : riding ? '내리기' : (seated>=0 || lying) ? '일어나기' : petting ? '' : nearDeer ? '고라니 타기' : nearRabbit ? '토끼 쓰다듬기' : nearBench>=0 ? '벤치에 앉기' : '';
     if (lab!==sitLabel){ sitLabel = lab; $('bSit').hidden = !lab; if (lab) $('bSit').textContent = lab; $('bSit').classList.toggle('quiet', lab==='일어나기'); } }
   const gy = groundY(cam.x,cam.z);
@@ -1747,7 +1756,7 @@ function frame(now){
   }
   requestAnimationFrame(frame);
 }
-window.sansa = {ballPos:() => [Math.round(ball.x*10)/10,Math.round(ball.z*10)/10],me:() => [cam.x,cam.z],deer:() => spawnAnimal('deer'), rabbit:() => spawnAnimal('rabbit'), head:() => cam.head*180/Math.PI,walker:(off) => { const sec = seoulSec(Date.now()+previewH*36e5); return sec>=23*3600 ? loopAt((sec-23*3600)*1.1+LOOP.len/2+(off||0)) : loopAt((sec-(sec>=18*3600?18:12)*3600)*.9+(off||0)); },birds:() => birds.map(b => [b.x,b.y,b.z]),lie:() => setLie(true), bird:() => { nextBird = 0; }, ball:(x,z,vx,vz) => { ball.x = x; ball.z = z; ball.vx = vx||0; ball.vz = vz||0; },animal:() => { nextAnimal = 0; }, animals:() => animals.map(a => [a.deer,Math.round(a.x),Math.round(a.z),a.wait>0]), view:t => { third = t; },preview:h => { previewH = h; }, weather:k => { wxKey = k; cur.cover = WX[k].cover; cur.fog = WX[k].fog; cur.rain = WX[k].rain; cur.snow = WX[k].snow; cur.snowGround = WX[k].snow; },
+window.sansa = {bench:i => { const b = BENCHES[i], l = seatAt(b,-1), r = seatAt(b,1); return {x:b.x,z:b.z,h:b.h,lx:l[0],lz:l[1],rx:r[0],rz:r[1]}; },ballPos:() => [Math.round(ball.x*10)/10,Math.round(ball.z*10)/10],me:() => [cam.x,cam.z],deer:() => spawnAnimal('deer'), rabbit:() => spawnAnimal('rabbit'), head:() => cam.head*180/Math.PI,walker:(off) => { const sec = seoulSec(Date.now()+previewH*36e5); return sec>=23*3600 ? loopAt((sec-23*3600)*1.1+LOOP.len/2+(off||0)) : loopAt((sec-(sec>=18*3600?18:12)*3600)*.9+(off||0)); },birds:() => birds.map(b => [b.x,b.y,b.z]),lie:() => setLie(true), bird:() => { nextBird = 0; }, ball:(x,z,vx,vz) => { ball.x = x; ball.z = z; ball.vx = vx||0; ball.vz = vz||0; },animal:() => { nextAnimal = 0; }, animals:() => animals.map(a => [a.deer,Math.round(a.x),Math.round(a.z),a.wait>0]), view:t => { third = t; },preview:h => { previewH = h; }, weather:k => { wxKey = k; cur.cover = WX[k].cover; cur.fog = WX[k].fog; cur.rain = WX[k].rain; cur.snow = WX[k].snow; cur.snowGround = WX[k].snow; },
   look:(x,z,yawDeg,pitch) => { cam.x = x; cam.z = z; cam.yaw = yawDeg*rad; cam.pitch = pitch||0; }, sun:() => sunPos(Date.now()+previewH*36e5).alt/rad};
 requestAnimationFrame(frame);
 })();
