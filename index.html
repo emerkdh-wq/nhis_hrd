@@ -1866,7 +1866,7 @@ const lampFlat = new Float32Array(48); LAMPS.forEach((l,i) => lampFlat.set([l[0]
 const soffit = []; for (let z=-24;z<=44;z+=4.6) for (const x of [-91.2,-93.6]) soffit.push(x,7.25,z);
 const soffitB = vbo(new Float32Array(soffit));
 // 반딧불: 테니스장 북쪽과 남쪽 나무 사이를 떠다닌다 (밤 11시~새벽 4시, 비·눈 오면 쉰다)
-const FF = []; for (let i=0;i<70;i++){ const north = i%2===0, x = 54+Math.random()*38, z = north ? -14-Math.random()*20 : 38+Math.random()*20;
+const FF = []; for (let i=0;i<35;i++){ const north = i%2===0, x = 54+Math.random()*38, z = north ? -14-Math.random()*20 : 38+Math.random()*20;
   FF.push({x, z, y:H(x,z)+.4+Math.random()*2.6, a:Math.random()*6.28, b:Math.random()*6.28, sp:.25+Math.random()*.35, r:1.5+Math.random()*2.5, ph:Math.random()*20}); }
 const ffArr = new Float32Array(FF.length*3), ffB = vbo(ffArr,true);
 const tGlowB = vbo(new Float32Array(tGlows.flat())), torchB = vbo(new Float32Array(3),true);
