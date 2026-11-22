@@ -1238,13 +1238,13 @@ function spawnAnimal(kind){
 const netOn = () => !!(window.MP && window.MP.ok && window.MP.worldOk!==false && !window.MP.offline);
 let wasLeader = false, animalsSynced = false;
 const r1 = v => Math.round(v*10)/10;
-// 르샤의 터: 북쪽 끝 벤치 줄 앞. 대부분 이 근처에서 짧게 옮겨 다니며 앉아 쉰다
-const CAT_HOME = {x0:-20, x1:20, z0:-53.6, z1:-45};
+// 르샤의 터: 북동쪽 끝 벤치 근처(운동장 북동 모서리). 대부분 이 근처에서 짧게 옮겨 다니며 앉아 쉰다
+const CAT_HOME = {x0:27, x1:40, z0:-53.6, z1:-37};
 const catWay = p => { const H0 = CAT_HOME, inHome = p && p[0]>H0.x0-2 && p[0]<H0.x1+2 && p[1]>H0.z0-2 && p[1]<H0.z1+2;
   if (!inHome) return [H0.x0+Math.random()*(H0.x1-H0.x0), H0.z0+Math.random()*(H0.z1-H0.z0)];
   const r = 3+Math.random()*8, t = Math.random()*6.283;
   return [Math.max(H0.x0,Math.min(H0.x1,p[0]+Math.cos(t)*r)), Math.max(H0.z0,Math.min(H0.z1,p[1]+Math.sin(t)*r))]; };
-function makeCat(){ return {id:'cheese-cat', cat:true, deer:false, x:-4, z:-50, h:1.2, ph:0, way:[catWay([-4,-50])], wait:20, flee:false, v:0, sitT:0}; }
+function makeCat(){ return {id:'cheese-cat', cat:true, deer:false, x:36, z:-46, h:1.2, ph:0, way:[catWay([36,-46])], wait:20, flee:false, v:0, sitT:0}; }
 function ensureCat(){ if (!animals.some(a => a.cat)) animals.push(makeCat()); }
 function releaseDeer(a){ a.ridden = false; a.v = 0; a.flee = false; a.wait = 1.2; a.way = [[48, clamp(a.z,-22,22)], [60, -40+Math.random()*20]]; }
 function animalFrom(o,keep){
