@@ -1190,8 +1190,9 @@ function spawnAnimal(kind){
 const netOn = () => !!(window.MP && window.MP.ok && window.MP.worldOk!==false && !window.MP.offline);
 let wasLeader = false, animalsSynced = false;
 const r1 = v => Math.round(v*10)/10;
-const catWay = () => [-32+Math.random()*68, -50+Math.random()*100];
-function makeCat(){ return {id:'cheese-cat', cat:true, deer:false, x:-20, z:30, h:1.2, ph:0, way:[catWay(),catWay(),catWay()], wait:3, flee:false, v:0, sitT:0}; }
+const catWay = p => { if (!p) return [-32+Math.random()*68, -50+Math.random()*100];   // 르샤는 가까운 곳으로 짧게 옮겨 다닌다
+  const r = 4+Math.random()*10, t = Math.random()*6.283; return [Math.max(-32,Math.min(36,p[0]+Math.cos(t)*r)), Math.max(-50,Math.min(50,p[1]+Math.sin(t)*r))]; };
+function makeCat(){ return {id:'cheese-cat', cat:true, deer:false, x:-20, z:30, h:1.2, ph:0, way:[catWay([-20,30])], wait:20, flee:false, v:0, sitT:0}; }
 function ensureCat(){ if (!animals.some(a => a.cat)) animals.push(makeCat()); }
 function releaseDeer(a){ a.ridden = false; a.v = 0; a.flee = false; a.wait = 1.2; a.way = [[48, clamp(a.z,-22,22)], [60, -40+Math.random()*20]]; }
 function animalFrom(o,keep){
@@ -1240,7 +1241,7 @@ function stepAnimals(dt,time){
   if (time>nextAnimal){ spawnAnimal(); nextAnimal = time + 22 + Math.random()*40; }
   for(let i=animals.length-1;i>=0;i--){
     const a = animals[i];
-    if (a.cat){ if (a.way.length<2) a.way.push(catWay(),catWay()); a.flee = false; a.sitT = a.v>0 ? 0 : (a.sitT||0)+dt;
+    if (a.cat){ if (a.way.length<2){ const w1 = catWay(a.way[a.way.length-1]||[a.x,a.z]); a.way.push(w1,catWay(w1)); } a.flee = false; a.sitT = a.v>0 ? 0 : (a.sitT||0)+dt;
       if (a.react && a.react.t>0){ a.react.t -= dt; if (a.react.k!==4) a.wait = Math.max(a.wait,.3); }
       if (a.runT>0) a.runT -= dt; }
     if (net){   // 다른 사람이 타거나 쓰다듬은 것을 반영한다
@@ -1258,7 +1259,7 @@ function stepAnimals(dt,time){
     if (near && !a.flee){ a.flee = true; a.wait = 0; a.way = a.way.slice(-2); }
     if (a.wait>0 && !a.flee){ a.wait -= dt; a.v = 0; a.cv = 0; continue; }
     const dx = w2[0]-a.x, dz = w2[1]-a.z, d = Math.hypot(dx,dz), sp = a.cat ? (a.runT>0 ? 6.5 : 1.1) : (a.deer?7.5:4.6)*(a.flee?1.5:1);
-    if (d<.8){ a.way.shift(); if (a.cat) a.wait = 3+Math.random()*9; else if (a.way.length>2 && !a.flee) a.wait = 1.5+Math.random()*4; continue; }
+    if (d<.8){ a.way.shift(); if (a.cat) a.wait = 20+Math.random()*30; else if (a.way.length>2 && !a.flee) a.wait = 1.5+Math.random()*4; continue; }
     const th = Math.atan2(dx,-dz); let dh = th-a.h; dh = Math.atan2(Math.sin(dh),Math.cos(dh));
     if (a.cat){   // 르샤: 목적지에 가까워지면 느려지고, 크게 꺾을 때는 걸음을 늦춰 천천히 돈다
       a.h += dh*Math.min(1,dt*(a.runT>0?4:1.8));
@@ -1627,7 +1628,7 @@ function catReact(a,k){
   a.react = {k, t:k===4 ? 1 : 2.8};
   if (k===1 || k===3){ a.pet = 2.6; a.wait = Math.max(a.wait,3); }
   if (k===2){ a.wait = Math.max(a.wait,1.8); }
-  if (k===4){ a.wait = 0; a.runT = 2.6; const ang = Math.atan2(a.x-cam.x,-(a.z-cam.z)); a.way = [[clamp(a.x+Math.sin(ang)*16,-32,36), clamp(a.z-Math.cos(ang)*16,-50,50)], catWay(), catWay()]; }
+  if (k===4){ a.wait = 0; a.runT = 2.6; const ang = Math.atan2(a.x-cam.x,-(a.z-cam.z)); const fw = [clamp(a.x+Math.sin(ang)*16,-32,36), clamp(a.z-Math.cos(ang)*16,-50,50)]; a.way = [fw, catWay(fw)]; }
 }
 function petRabbit(a){
   if (a.cat){
