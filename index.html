@@ -1190,9 +1190,13 @@ function spawnAnimal(kind){
 const netOn = () => !!(window.MP && window.MP.ok && window.MP.worldOk!==false && !window.MP.offline);
 let wasLeader = false, animalsSynced = false;
 const r1 = v => Math.round(v*10)/10;
-const catWay = p => { if (!p) return [-32+Math.random()*68, -50+Math.random()*100];   // 르샤는 가까운 곳으로 짧게 옮겨 다닌다
-  const r = 4+Math.random()*10, t = Math.random()*6.283; return [Math.max(-32,Math.min(36,p[0]+Math.cos(t)*r)), Math.max(-50,Math.min(50,p[1]+Math.sin(t)*r))]; };
-function makeCat(){ return {id:'cheese-cat', cat:true, deer:false, x:-20, z:30, h:1.2, ph:0, way:[catWay([-20,30])], wait:20, flee:false, v:0, sitT:0}; }
+// 르샤의 터: 북쪽 끝 벤치 줄 앞. 대부분 이 근처에서 짧게 옮겨 다니며 앉아 쉰다
+const CAT_HOME = {x0:-20, x1:20, z0:-53.6, z1:-45};
+const catWay = p => { const H0 = CAT_HOME, inHome = p && p[0]>H0.x0-2 && p[0]<H0.x1+2 && p[1]>H0.z0-2 && p[1]<H0.z1+2;
+  if (!inHome) return [H0.x0+Math.random()*(H0.x1-H0.x0), H0.z0+Math.random()*(H0.z1-H0.z0)];
+  const r = 3+Math.random()*8, t = Math.random()*6.283;
+  return [Math.max(H0.x0,Math.min(H0.x1,p[0]+Math.cos(t)*r)), Math.max(H0.z0,Math.min(H0.z1,p[1]+Math.sin(t)*r))]; };
+function makeCat(){ return {id:'cheese-cat', cat:true, deer:false, x:-4, z:-50, h:1.2, ph:0, way:[catWay([-4,-50])], wait:20, flee:false, v:0, sitT:0}; }
 function ensureCat(){ if (!animals.some(a => a.cat)) animals.push(makeCat()); }
 function releaseDeer(a){ a.ridden = false; a.v = 0; a.flee = false; a.wait = 1.2; a.way = [[48, clamp(a.z,-22,22)], [60, -40+Math.random()*20]]; }
 function animalFrom(o,keep){
@@ -1407,12 +1411,19 @@ function drawBirds(m,time){
 }
 /* ───────── 축구공 ───────── */
 const ball = {x:9, z:17, y:0, vx:0, vz:0, vy:0, goalT:0};
-let ballK = null;
+let ballK = null, ballHour = null;
+function centerBall(){ ball.x = 0; ball.z = 0; ball.y = 0; ball.vx = ball.vz = ball.vy = 0; ball.goalT = 0; ball.inNet = false; }
 function stepBall(dt,dx,dz,sp,run){
   const net = netOn(), MP = window.MP;
+  // 정각마다 공을 센터서클 가운데로 되돌린다 (모든 화면이 같은 시각에 함께 되돌린다)
+  const hk = Math.floor((net ? MP.now() : Date.now())/36e5);
+  if (ballHour===null) ballHour = hk;
+  else if (hk!==ballHour){ ballHour = hk; centerBall(); ballK = 'h'+hk;
+    if (net) MP.setBall({x:0, z:0, y:0, vx:0, vz:0, vy:0, g:0, k:ballK}, true); }
   if (net && MP.ball && MP.ball.k!==ballK){   // 다른 사람이 찬 공: 찬 순간부터 지난 시간만큼 굴려 맞춘다
     const b = MP.ball; ballK = b.k;
-    if (b.by!==MP.id){ ball.x = b.x; ball.z = b.z; ball.y = b.y||0; ball.vx = b.vx||0; ball.vz = b.vz||0; ball.vy = b.vy||0; ball.goalT = b.g||0; ball.inNet = Math.abs(ball.z)>50.2 && Math.abs(ball.x)<3.5;
+    if (b.t && b.t<hk*36e5) centerBall();   // 지난 시간대에 찬 공은 이미 가운데로 돌아와 있다
+    else if (b.by!==MP.id){ ball.x = b.x; ball.z = b.z; ball.y = b.y||0; ball.vx = b.vx||0; ball.vz = b.vz||0; ball.vy = b.vy||0; ball.goalT = b.g||0; ball.inNet = Math.abs(ball.z)>50.2 && Math.abs(ball.x)<3.5;
       let el = clamp((MP.now()-(b.t||MP.now()))/1000,0,8); while (el>1e-4){ const s1 = Math.min(el,1/60); ballPhys(s1,true); el -= s1; } }
   }
   let kicked = false, pushed = false;
