@@ -613,7 +613,7 @@ function scatter(n,x0,x1,z0,z1,pr,h0,h1,ok){
 }
 const TOMATO = {x:0, z:0, fruits:[], eaten:[]};
 for(const z of [-50,-38,-26,-16,40,52]){
-  if (z===52){ TOMATO.x = 47+rr(-1,1); TOMATO.z = z+rr(-1,1); rr(3,4.2); leafCol(); continue; }
+  if (z===-50){ TOMATO.x = 47+rr(-1,1); TOMATO.z = z+rr(-1,1); rr(3,4.2); leafCol(); continue; }
   leafy(47+rr(-1,1),z+rr(-1,1),rr(3,4.2),leafCol());
 }
 /* 방울토마토 나무: 지지대 세 개에 덩굴잎이 층층이 감기고, 송이마다 빨갛게 익은 방울토마토가 달린다 */
