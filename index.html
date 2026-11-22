@@ -414,8 +414,8 @@ function fence(x0,z0,x1,z1,h,y0){
   FENCE.quad([x0,y0,z0],[x1,y0,z1],[x1,y0+h,z1],[x0,y0+h,z0],WHITE,[[0,0],[len/1.2,0],[len/1.2,h/1.2],[0,h/1.2]]);
 }
 fence(-38,-56.6,41,-56.6,7,0); fence(-38,56.6,41,56.6,7,0);
-// 방명록 게시판: 남쪽 철망에 붙여 운동장 쪽을 본다
-const GB_AT = [-13.5,55.5], BOARD = new Mesh();
+// 방명록 게시판: 남동쪽 끝 철망에 붙여 운동장 쪽을 본다
+const GB_AT = [34.5,55.5], BOARD = new Mesh();
 for (const sx of [-1.65,1.65]) P.box(GB_AT[0]+sx,0,GB_AT[1]+.12,.14,3,.14,C.wood);
 P.box(GB_AT[0],.82,GB_AT[1]+.16,3.3,1.96,.1,C.wood);
 P.box(GB_AT[0],2.9,GB_AT[1]+.05,3.7,.12,.6,[.18,.14,.12]);
@@ -800,7 +800,7 @@ T.fence = meshTex('rgba(70,170,105,.95)',5);
 { // 방명록 게시판 그림: 코르크판에 쪽지들
   const c = cv(1024,512), x = c.getContext('2d'); x.fillStyle = '#b8875a'; x.fillRect(0,0,1024,512);
   for (let i=0;i<5000;i++){ x.fillStyle = rnd()<.5 ? 'rgba(90,50,20,.18)' : 'rgba(255,230,190,.14)'; x.fillRect(rnd()*1024,rnd()*512,3,3); }
-  x.fillStyle = '#f4efe2'; x.fillRect(332,26,360,104); x.fillStyle = '#2b3a36'; x.font = 'bold 72px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('방명록',512,80);
+  x.fillStyle = '#f4efe2'; x.fillRect(272,26,480,104); x.fillStyle = '#2b3a36'; x.font = 'bold 66px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('GUESTBOOK',512,80);
   const notes = [['#fff4a8',70,60,-.08],['#ffd0dc',800,52,.07],['#cfe8ff',96,250,.05],['#d8f5c8',300,190,-.04],['#fff4a8',520,200,.06],['#ffd0dc',740,250,-.06],['#cfe8ff',420,330,-.03],['#fff',870,330,.08],['#d8f5c8',150,380,-.07]];
   for (const [col,nx,ny,r] of notes){ x.save(); x.translate(nx+70,ny+60); x.rotate(r); x.fillStyle = 'rgba(0,0,0,.18)'; x.fillRect(-66,-54,140,120); x.fillStyle = col; x.fillRect(-70,-60,140,120);
     x.fillStyle = 'rgba(60,60,80,.55)'; for (let l=0;l<4;l++) x.fillRect(-54,-34+l*24,90+rnd()*20-(l===3?40:0),5); x.fillStyle = '#c0392b'; x.beginPath(); x.arc(0,-50,7,0,6.283); x.fill(); x.restore(); }
