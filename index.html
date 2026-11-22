@@ -813,13 +813,13 @@ function meshTex(stroke,lw){
 { const e=cv(64,64), y=e.getContext('2d'); const g=y.createLinearGradient(0,0,0,64); g.addColorStop(0,'#ffdca4'); g.addColorStop(1,'#e9b46c');
   y.fillStyle=g; y.fillRect(0,0,64,64); y.fillStyle='#2a2420'; y.fillRect(0,0,3,64); y.fillRect(31,0,2,64); T.lobbyE = tex(e,true); }
 T.fence = meshTex('rgba(70,170,105,.95)',5);
-{ // 방명록 게시판 그림: 코르크판에 쪽지들
-  const c = cv(1024,512), x = c.getContext('2d'); x.fillStyle = '#b8875a'; x.fillRect(0,0,1024,512);
-  for (let i=0;i<5000;i++){ x.fillStyle = rnd()<.5 ? 'rgba(90,50,20,.18)' : 'rgba(255,230,190,.14)'; x.fillRect(rnd()*1024,rnd()*512,3,3); }
-  x.fillStyle = '#f4efe2'; x.fillRect(272,26,480,104); x.fillStyle = '#2b3a36'; x.font = 'bold 66px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('GUESTBOOK',512,80);
-  const notes = [['#fff4a8',70,60,-.08],['#ffd0dc',800,52,.07],['#cfe8ff',96,250,.05],['#d8f5c8',300,190,-.04],['#fff4a8',520,200,.06],['#ffd0dc',740,250,-.06],['#cfe8ff',420,330,-.03],['#fff',870,330,.08],['#d8f5c8',150,380,-.07]];
-  for (const [col,nx,ny,r] of notes){ x.save(); x.translate(nx+70,ny+60); x.rotate(r); x.fillStyle = 'rgba(0,0,0,.18)'; x.fillRect(-66,-54,140,120); x.fillStyle = col; x.fillRect(-70,-60,140,120);
-    x.fillStyle = 'rgba(60,60,80,.55)'; for (let l=0;l<4;l++) x.fillRect(-54,-34+l*24,90+rnd()*20-(l===3?40:0),5); x.fillStyle = '#c0392b'; x.beginPath(); x.arc(0,-50,7,0,6.283); x.fill(); x.restore(); }
+{ // 방명록 게시판 그림: 짙은 녹색 판에 차분한 쪽지들
+  const c = cv(1024,512), x = c.getContext('2d'); x.fillStyle = '#1e3a2b'; x.fillRect(0,0,1024,512);
+  for (let i=0;i<5000;i++){ x.fillStyle = rnd()<.5 ? 'rgba(0,0,0,.14)' : 'rgba(180,220,190,.05)'; x.fillRect(rnd()*1024,rnd()*512,3,3); }
+  x.fillStyle = 'rgba(255,255,255,.07)'; x.fillRect(272,26,480,104); x.fillStyle = '#d9e4dc'; x.font = 'bold 66px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('GUESTBOOK',512,80);
+  const notes = [['#cfd6cc',70,60,-.05],['#c9cfc4',800,52,.04],['#d3d8cf',96,250,.03],['#c6cdc2',300,190,-.03],['#cfd6cc',520,200,.04],['#c9cfc4',740,250,-.04],['#d3d8cf',420,330,-.02],['#c6cdc2',870,330,.05],['#cfd6cc',150,380,-.04]];
+  for (const [col,nx,ny,r] of notes){ x.save(); x.translate(nx+70,ny+60); x.rotate(r); x.fillStyle = 'rgba(0,0,0,.25)'; x.fillRect(-66,-54,140,120); x.fillStyle = col; x.fillRect(-70,-60,140,120);
+    x.fillStyle = 'rgba(40,55,45,.45)'; for (let l=0;l<4;l++) x.fillRect(-54,-34+l*24,90+rnd()*20-(l===3?40:0),5); x.fillStyle = '#5a6b60'; x.beginPath(); x.arc(0,-50,6,0,6.283); x.fill(); x.restore(); }
   T.board = tex(c,false); } T.net = meshTex('rgba(245,245,240,.9)',4);
 
 /* ───────── 셰이더 ───────── */
