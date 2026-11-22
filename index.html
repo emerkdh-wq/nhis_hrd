@@ -1176,7 +1176,7 @@ function syncAnimals(dt,MP){
     if (a.tv>0 && !a.tr){ a.tx += Math.sin(a.th)*a.tv*dt; a.tz -= Math.cos(a.th)*a.tv*dt; }
     const ox = a.x, oz = a.z; a.x += (a.tx-a.x)*k; a.z += (a.tz-a.z)*k;
     let dh = a.th-a.h; dh = Math.atan2(Math.sin(dh),Math.cos(dh)); a.h += dh*k;
-    const mv = Math.hypot(a.x-ox,a.z-oz); a.v = a.cat ? mv/Math.max(dt,1e-3) : a.tv; a.ph += mv*(a.deer?1.5:a.cat?18:2.8); a.sitT = a.v>0 ? 0 : (a.sitT||0)+dt;
+    const mv = Math.hypot(a.x-ox,a.z-oz); a.v = a.cat ? mv/Math.max(dt,1e-3) : a.tv; a.ph += mv*(a.deer?1.5:a.cat?9:2.8); a.sitT = a.v>0 ? 0 : (a.sitT||0)+dt;
     a.ridden = a.tr || riding===a;
     if (a.tp && !(a.pet>0)) a.pet = 2.6; else if (a.pet>0) a.pet -= dt;
     if (a.react && a.react.t>0) a.react.t -= dt;
@@ -1227,7 +1227,7 @@ function stepAnimals(dt,time){
       a.h += dh*Math.min(1,dt*(a.runT>0?4:1.8));
       const want = sp*clamp(d/1.6,.3,1)*(1-.6*Math.min(1,Math.abs(dh)/1.4));
       a.cv = (a.cv||0) + (want-(a.cv||0))*Math.min(1,dt*2.2);
-      a.x += Math.sin(a.h)*a.cv*dt; a.z -= Math.cos(a.h)*a.cv*dt; a.v = a.cv; a.ph += a.cv*dt*18;
+      a.x += Math.sin(a.h)*a.cv*dt; a.z -= Math.cos(a.h)*a.cv*dt; a.v = a.cv; a.ph += a.cv*dt*9;
       continue;
     }
     a.h += dh*Math.min(1,dt*6);
