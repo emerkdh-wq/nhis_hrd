@@ -1628,7 +1628,7 @@ syncWx(); liveWeather(); setInterval(liveWeather, 15*60*1000);
 $('bWx').onclick = () => { $('sheet').hidden = !$('sheet').hidden; };
 $('bClose').onclick = () => { $('sheet').hidden = true; };
 /* ───────── 방명록 ───────── */
-let gbOff = null, ntOff = null, gbLast = 0, gbList = [], ntList = [], gbErr = false, gbLoaded = false, gbAdmin = false;
+let gbRetry = 0, gbTry = 0, gbOff = null, ntOff = null, gbLast = 0, gbList = [], ntList = [], gbErr = false, gbLoaded = false, gbAdmin = false;
 const gbKey = () => store2.get('cp-gbkey','');
 const gbTime = t => { if (!t) return ''; const dt = new Date(t+9*3600e3); return (dt.getUTCMonth()+1)+'월 '+dt.getUTCDate()+'일 '+String(dt.getUTCHours()).padStart(2,'0')+':'+String(dt.getUTCMinutes()).padStart(2,'0'); };
 function gbDelBtn(run,okMsg){   // 관리자 삭제 버튼: 두 번 눌러야 지워진다
@@ -1669,13 +1669,18 @@ function gbSyncMode(){ const nt = gbAdmin && $('gbNt').checked, max = nt ? 200 :
 function openGB(){
   const MP = window.MP; $('gbook').hidden = false; $('sheet').hidden = true; move.x = move.y = 0; firstTouch();
   gbErr = false; gbLoaded = false; gbList = []; ntList = [];
-  if (MP && MP.ok && !MP.offline && MP.gbWatch){
+  // 방명록은 함께 걷기 입장과 상관없이 Firebase에 닿기만 하면 읽고 쓸 수 있다. 아직 준비 중이면 잠시 기다렸다 다시 붙는다
+  if (!(MP && MP.gbWatch)){ $('gblist').textContent = ''; const p = document.createElement('p'); p.className = 'gbempty'; p.textContent = '연결하는 중이에요';
+    $('gblist').appendChild(p); clearTimeout(gbRetry); if ((gbTry = (gbTry||0)+1) <= 30) gbRetry = setTimeout(() => { if (!$('gbook').hidden) openGB(); }, 500);
+    else p.textContent = '지금은 연결되어 있지 않아 방명록을 볼 수 없어요. 잠시 뒤 다시 열어 주세요.'; return; }
+  gbTry = 0;
+  if (MP && MP.gbWatch){
     gbDraw(); if (gbOff) gbOff(); if (ntOff) ntOff();
     gbOff = MP.gbWatch(list => { if (list===null) gbErr = true; else { gbList = list; gbErr = false; } gbLoaded = true; gbDraw(); });
     ntOff = MP.ntWatch(list => { ntList = list||[]; gbDraw(); });
   } else { $('gblist').textContent = ''; const p = document.createElement('p'); p.className = 'gbempty'; p.textContent = '지금은 연결되어 있지 않아 방명록을 볼 수 없어요. 함께 걷기에 들어온 뒤 다시 열어 주세요.'; $('gblist').appendChild(p); }
 }
-function closeGB(){ $('gbook').hidden = true; gbSetAdmin(false); if (gbOff){ gbOff(); gbOff = null; } if (ntOff){ ntOff(); ntOff = null; } }
+function closeGB(){ $('gbook').hidden = true; clearTimeout(gbRetry); gbTry = 0; gbSetAdmin(false); if (gbOff){ gbOff(); gbOff = null; } if (ntOff){ ntOff(); ntOff = null; } }
 $('gbClose').onclick = closeGB;
 // 관리자 모드: '방명록' 제목을 3초 안에 5번 누르면 들어가고, 다시 5번 누르면 나온다
 let gbTaps = [];
@@ -1694,7 +1699,7 @@ $('gbmsg').addEventListener('keydown', e => e.stopPropagation());
 $('gbmsg').addEventListener('input', () => { $('gbcnt').textContent = $('gbmsg').value.length+'/'+$('gbmsg').maxLength; });
 $('gbsend').onclick = () => {
   const MP = window.MP, nt = gbAdmin && $('gbNt').checked, m = $('gbmsg').value.trim().slice(0, nt ? 200 : 120);
-  if (!m) return; if (!(MP && MP.ok && !MP.offline && MP.gbAdd)){ toast('연결되어 있지 않아 남기지 못했어요'); return; }
+  if (!m) return; if (!(MP && MP.gbAdd)){ toast('연결되어 있지 않아 남기지 못했어요'); return; }
   const now = performance.now(); if (!nt && now-gbLast<20000){ toast('잠시 뒤에 다시 남겨 주세요'); return; }
   if (!nt) gbLast = now; $('gbsend').disabled = true;
   (nt ? MP.ntAdd(m, gbKey()) : MP.gbAdd(String(nick).slice(0,10), m))
