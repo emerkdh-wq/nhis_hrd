@@ -1142,7 +1142,7 @@ function spawnAnimal(kind){
   toast(deer ? '고라니가 나타났어요' : (n>1 ? '토끼 두 마리가 운동장에 들어왔어요' : '토끼 한 마리가 운동장에 들어왔어요'), animals[first]);
 }
 /* 함께 걷기 중에는 접속자 중 한 명(대표)의 화면이 동물을 움직이고, 다른 사람은 그 상태를 받아 보여 준다 */
-const netOn = () => !!(window.MP && window.MP.ok && window.MP.worldOk!==false);
+const netOn = () => !!(window.MP && window.MP.ok && window.MP.worldOk!==false && !window.MP.offline);
 let wasLeader = false, animalsSynced = false;
 const r1 = v => Math.round(v*10)/10;
 const catWay = () => [-32+Math.random()*68, -50+Math.random()*100];
@@ -1150,9 +1150,10 @@ function makeCat(){ return {id:'cheese-cat', cat:true, deer:false, x:-20, z:30, 
 function ensureCat(){ if (!animals.some(a => a.cat)) animals.push(makeCat()); }
 function releaseDeer(a){ a.ridden = false; a.v = 0; a.flee = false; a.wait = 1.2; a.way = [[48, clamp(a.z,-22,22)], [60, -40+Math.random()*20]]; }
 function animalFrom(o,keep){
+  if (keep && o.q!==undefined && keep.q===o.q) return keep;
   const a = keep || {id:o.id, ph:Math.random()*6, x:o.x, z:o.z, h:o.h||0, way:[], wait:0, flee:false, v:0};
   a.deer = !!o.d; a.cat = !!o.c; a.tk = o.k||0; a.tx = o.x; a.tz = o.z; a.th = o.h||0; a.tv = o.v||0; a.tr = !!o.r; a.tp = !!o.p;
-  if (o.w) a.way = o.w.map(q => [q[0],q[1]]); a.wait = o.t||0; a.flee = !!o.f; return a;
+  if (o.w) a.way = o.w.map(q => [q[0],q[1]]); a.wait = o.t||0; a.flee = !!o.f; a.q = o.q; return a;
 }
 function syncAnimals(dt,MP){
   const list = Array.isArray(MP.animals) ? MP.animals : Object.values(MP.animals||{}), ids = new Set(), k = 1-Math.exp(-dt*7);
@@ -1164,6 +1165,7 @@ function syncAnimals(dt,MP){
   }
   for (let i=animals.length-1;i>=0;i--) if (!ids.has(animals[i].id)){ if (riding===animals[i]) riding = null; animals.splice(i,1); }
   for (const a of animals){
+    if (a.tv>0 && !a.tr){ a.tx += Math.sin(a.th)*a.tv*dt; a.tz -= Math.cos(a.th)*a.tv*dt; }
     const ox = a.x, oz = a.z; a.x += (a.tx-a.x)*k; a.z += (a.tz-a.z)*k;
     let dh = a.th-a.h; dh = Math.atan2(Math.sin(dh),Math.cos(dh)); a.h += dh*k;
     const mv = Math.hypot(a.x-ox,a.z-oz); a.v = a.tv; a.ph += mv*(a.deer?1.5:a.cat?9:2.8); a.sitT = a.v>0 ? 0 : (a.sitT||0)+dt;
@@ -1187,6 +1189,7 @@ function stepAnimals(dt,time){
     for (const o of list){ if (!o || !o.id) continue; const a = animals.find(q => q.id===o.id); if (a) animalFrom(o,a); else animals.push(animalFrom(o)); }
     for (const a of animals){ a.x = a.tx??a.x; a.z = a.tz??a.z; a.h = a.th??a.h; }
     ensureCat(); nextAnimal = Math.max(nextAnimal, time+8);
+    pubSt.clear(); MP.resetAnimals();
   }
   ensureCat();
   if (time>nextAnimal){ spawnAnimal(); nextAnimal = time + 22 + Math.random()*40; }
@@ -1214,8 +1217,23 @@ function stepAnimals(dt,time){
     const th = Math.atan2(dx,-dz); let dh = th-a.h; dh = Math.atan2(Math.sin(dh),Math.cos(dh)); a.h += dh*Math.min(1,dt*6);
     a.x += Math.sin(a.h)*sp*dt; a.z -= Math.cos(a.h)*sp*dt; a.v = sp; a.ph += dt*(a.cat?8:a.deer?11:13)*(a.flee?1.3:1);
   }
-  if (net) MP.pubAnimals(animals.map(a => ({id:a.id, d:a.deer?1:0, c:a.cat?1:0, k:a.react&&a.react.t>0?a.react.k:0, x:r1(a.x), z:r1(a.z), h:Math.round(a.h*100)/100, v:a.wait>0&&!a.flee?0:r1(a.v),
-    p:a.pet>0?1:0, r:a.ridden?1:0, w:a.way.map(q => [r1(q[0]),r1(q[1])]), t:r1(Math.max(0,a.wait)), f:a.flee?1:0})));
+  if (net) publishAnimals(MP,time);
+}
+const pubSt = new Map();
+function publishAnimals(MP,time){
+  const ch = {}; let any = false;
+  for (const a of animals){
+    const v = a.wait>0&&!a.flee ? 0 : r1(a.v), kk = a.react&&a.react.t>0 ? a.react.k : 0;
+    const sig = [v>0, kk, a.pet>0, a.ridden, a.flee, a.way.length].join('|'), ps = pubSt.get(a.id);
+    if (ps && ps.sig===sig && time-ps.t<1) continue;
+    const q = (ps ? ps.q : 0)+1, full = !ps || ps.wl!==a.way.length || time-ps.wt>6;
+    const o = {id:a.id, d:a.deer?1:0, c:a.cat?1:0, k:kk, x:r1(a.x), z:r1(a.z), h:Math.round(a.h*100)/100, v, p:a.pet>0?1:0, r:a.ridden?1:0, t:r1(Math.max(0,a.wait)), f:a.flee?1:0, q};
+    if (full) o.w = a.way.map(w => [r1(w[0]),r1(w[1])]);
+    if (!ps) ch[a.id] = o; else for (const k in o) ch[a.id+'/'+k] = o[k];
+    pubSt.set(a.id, {sig, t:time, q, wl:a.way.length, wt:full ? time : ps.wt}); any = true;
+  }
+  for (const id of [...pubSt.keys()]) if (!animals.some(a => a.id===id)){ ch[id] = null; pubSt.delete(id); any = true; }
+  if (any) MP.pubAnimals(ch);
 }
 function drawAnimal(m,a){
   const f=[Math.sin(a.h),-Math.cos(a.h)], r=[Math.cos(a.h),Math.sin(a.h)], moving = a.v>0;
@@ -1386,12 +1404,14 @@ $('bWave').onclick = () => { myWave = performance.now()/1000; myWaveId = Date.no
 const tagEls = new Map(); let lastMpCount = -1;
 function myPose(){ return riding ? 4 : petting ? 5 : lying ? 2 : seated>=0 ? 1 : resting ? 3 : 0; }
 function drawPeers(m,dt,time,VP){
-  const MP = window.MP; if (!MP || !MP.ok) return;
-  const k = 1-Math.exp(-dt*8), seen = new Set();
+  const MP = window.MP; if (!MP || !MP.ok || MP.offline) return;
+  const k = 1-Math.exp(-dt*6), seen = new Set();
   for (const [id,p] of MP.peers){
     seen.add(id);
-    if (p.rx===undefined){ p.rx = p.x; p.rz = p.z; p.rh = p.h||0; p.ph = 0; }
-    const ox = p.rx, oz = p.rz; p.rx += (p.x-p.rx)*k; p.rz += (p.z-p.rz)*k;
+    if (p.rx===undefined){ p.rx = p.x; p.rz = p.z; p.rh = p.h||0; p.ph = 0; p._lx = p.x; p._lz = p.z; p._lt = time; p.vx = p.vz = 0; }
+    if (p.x!==p._lx || p.z!==p._lz){ const el = Math.max(.15,time-p._lt); p.vx = clamp((p.x-p._lx)/el,-12,12); p.vz = clamp((p.z-p._lz)/el,-12,12); p._lx = p.x; p._lz = p.z; p._lt = time; }
+    const age = time-p._lt, ahead = age<.8 ? Math.min(age,.55) : 0, tx = p.x+p.vx*ahead, tz = p.z+p.vz*ahead;
+    const ox = p.rx, oz = p.rz; p.rx += (tx-p.rx)*k; p.rz += (tz-p.rz)*k;
     let dh = (p.h||0)-p.rh; dh = Math.atan2(Math.sin(dh),Math.cos(dh)); p.rh += dh*k;
     const mv = Math.hypot(p.rx-ox,p.rz-oz); p.ph += mv*1.6; const moving = mv/Math.max(dt,1e-3) > .4;
     if (p.w && p.w!==p._lastW){ p._lastW = p.w; if (p._seenW){ p.waveUntil = time+2.6; if (Math.hypot(p.x-cam.x,p.z-cam.z)<40) toast((p.n||'손님')+'님이 손을 흔들어요'); } }
@@ -1869,22 +1889,33 @@ try {
   D.onValue(D.ref(db,'world/ball'), s => { MP.ball = s.val(); }, failWorld);
   D.onValue(D.ref(db,'world/acts'), s => { MP.acts = s.val()||{}; }, failWorld);
   MP.now = () => Date.now()+offset;
-  MP.ready = () => gotPlayers && performance.now()-t0 > 2500;
+  let t0r = t0;
+  MP.ready = () => gotPlayers && performance.now()-t0r > 2500;
   MP.leader = () => { for (const k of peers.keys()) if (k<id) return false; return true; };   // 아이디가 가장 작은 사람이 대표
-  let lastA = 0, lastAJ = '';
-  MP.pubAnimals = list => { const n = performance.now(); if (n-lastA<250) return; const j = JSON.stringify(list); if (j===lastAJ && n-lastA<3000) return;
-    lastA = n; lastAJ = j; D.set(D.ref(db,'world/animals'), list).catch(failWorld); };
+  MP.pubAnimals = ch => { if (!MP.offline) D.update(D.ref(db,'world/animals'), ch).catch(failWorld); };
+  MP.resetAnimals = () => { if (!MP.offline) D.set(D.ref(db,'world/animals'), null).catch(failWorld); };
   let lastB = 0;
-  MP.setBall = (st,force) => { const n = performance.now(); if (!force && n-lastB<150) return; lastB = n;
+  MP.setBall = (st,force) => { const n = performance.now(); if (MP.offline || (!force && n-lastB<400)) return; lastB = n;
     D.set(D.ref(db,'world/ball'), Object.assign({}, st, {by:id, t:D.serverTimestamp()})).catch(failWorld); };
   MP.act = (aid,obj) => D.update(D.ref(db,'world/acts/'+aid), Object.assign({}, obj, {by:id})).catch(failWorld);
   MP.clearAct = aid => D.remove(D.ref(db,'world/acts/'+aid)).catch(() => {});
-  let last = 0, lastJson = '', lastBeat = 0;
+  // 내 상태: 0.5초마다, 바뀐 값만 보낸다. 15초마다 살아 있다는 신호만 보낸다
+  let last = 0, lastBeat = 0, sent = null;
   MP.send = st => {
-    const now = performance.now(); if (now-last<200) return;
-    const j = JSON.stringify(st); if (j===lastJson && now-lastBeat<15000) return;
-    last = now; lastJson = j; lastBeat = now; D.set(me, Object.assign({}, st, {t:D.serverTimestamp()})).catch(e => console.warn('함께 걷기 저장 실패', e));
+    if (MP.offline) return;
+    const now = performance.now(); if (now-last<500) return;
+    if (!sent){ last = lastBeat = now; sent = Object.assign({}, st); D.set(me, Object.assign({}, st, {t:D.serverTimestamp()})).catch(e => console.warn('함께 걷기 저장 실패', e)); return; }
+    const diff = {}; let n = 0; for (const k in st) if (st[k]!==sent[k]){ diff[k] = st[k]; n++; }
+    if (!n && now-lastBeat<15000) return;
+    last = lastBeat = now; Object.assign(sent, diff); diff.t = D.serverTimestamp();
+    D.update(me, diff).catch(e => console.warn('함께 걷기 저장 실패', e));
   };
+  // 다른 창으로 1분 넘게 가 있으면 연결을 잠시 끊어 자리와 사용량을 아낀다
+  let hideT = null;
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden){ clearTimeout(hideT); hideT = setTimeout(() => { MP.offline = true; gotPlayers = false; peers.clear(); D.goOffline(db); }, 60000); }
+    else { clearTimeout(hideT); if (MP.offline){ D.goOnline(db); D.onDisconnect(me).remove(); sent = null; t0r = performance.now(); MP.offline = false; } }
+  });
   window.MP = MP;
   addEventListener('pagehide', () => { D.remove(me); });
 } catch(e){ console.warn('함께 걷기에 연결하지 못해 혼자 걷기로 둡니다:', e); }
