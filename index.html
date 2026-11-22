@@ -1411,7 +1411,7 @@ function stepBall(dt,dx,dz,sp,run){
   const net = netOn(), MP = window.MP;
   if (net && MP.ball && MP.ball.k!==ballK){   // 다른 사람이 찬 공: 찬 순간부터 지난 시간만큼 굴려 맞춘다
     const b = MP.ball; ballK = b.k;
-    if (b.by!==MP.id){ ball.x = b.x; ball.z = b.z; ball.y = b.y||0; ball.vx = b.vx||0; ball.vz = b.vz||0; ball.vy = b.vy||0; ball.goalT = b.g||0;
+    if (b.by!==MP.id){ ball.x = b.x; ball.z = b.z; ball.y = b.y||0; ball.vx = b.vx||0; ball.vz = b.vz||0; ball.vy = b.vy||0; ball.goalT = b.g||0; ball.inNet = Math.abs(ball.z)>50.2 && Math.abs(ball.x)<3.5;
       let el = clamp((MP.now()-(b.t||MP.now()))/1000,0,8); while (el>1e-4){ const s1 = Math.min(el,1/60); ballPhys(s1,true); el -= s1; } }
   }
   let kicked = false, pushed = false;
@@ -1426,15 +1426,17 @@ function stepBall(dt,dx,dz,sp,run){
   ballPhys(dt,false);
 }
 function ballPhys(dt,quiet){
-  if (ball.goalT>0){ ball.goalT -= dt; if (ball.goalT<=0){ ball.x = 0; ball.z = 0; ball.y = 0; ball.vx = ball.vz = ball.vy = 0; } }
+  if (ball.goalT>0) ball.goalT -= dt;   // 골이 들어가도 공은 골대 안에 그대로 남아 다시 찰 수 있다
   ball.vy -= 9.8*dt; ball.x += ball.vx*dt; ball.z += ball.vz*dt; ball.y += ball.vy*dt;
   if (ball.y<0){ ball.y = 0; ball.vy = ball.vy<-1.2 ? -ball.vy*.5 : 0; }
   const fr = Math.exp(-dt*(ball.y<=.001 ? .8 : .1)); ball.vx *= fr; ball.vz *= fr;
   if (Math.hypot(ball.vx,ball.vz)<.05) ball.vx = ball.vz = 0;
   if (ball.x<-37.6){ ball.x = -37.6; ball.vx = Math.abs(ball.vx)*.5; } if (ball.x>40.2){ ball.x = 40.2; ball.vx = -Math.abs(ball.vx)*.5; }
-  const zMax = ball.goalT>0 ? 51.7 : 55.8;
+  if (ball.inNet && Math.abs(ball.z)<50) ball.inNet = false;   // 골대 밖으로 나오면 다음 골을 다시 셀 수 있다
+  if (ball.inNet && Math.abs(ball.z)>50.2){ if (ball.x<-3.4){ ball.x = -3.4; ball.vx = Math.abs(ball.vx)*.3; } if (ball.x>3.4){ ball.x = 3.4; ball.vx = -Math.abs(ball.vx)*.3; } }
+  const zMax = ball.inNet ? 51.7 : 55.8;
   if (ball.z<-zMax){ ball.z = -zMax; ball.vz = Math.abs(ball.vz)*.3; } if (ball.z>zMax){ ball.z = zMax; ball.vz = -Math.abs(ball.vz)*.3; }
-  if (!(ball.goalT>0) && Math.abs(ball.z)>50.2 && Math.abs(ball.z)<52 && Math.abs(ball.x)<3.5 && ball.y<2.3){ ball.goalT = 2.8; ball.vx *= .25; ball.vz *= .25; if (!quiet){ toast('골!'); if (ac && sndOn) chime(); } }
+  if (!ball.inNet && Math.abs(ball.z)>50.2 && Math.abs(ball.z)<52 && Math.abs(ball.x)<3.5 && ball.y<2.3){ ball.goalT = 2.8; ball.inNet = true; ball.vx *= .25; ball.vz *= .25; if (!quiet){ toast('골!'); if (ac && sndOn) chime(); } }
 }
 /* ───────── 운동장 둘레 산책 (12~13시 남녀 둘, 23~24시 손전등 든 여자) ───────── */
 const LOOP = {x0:-35, x1:38.2, z0:-53.5, z1:53.5};
@@ -1958,7 +1960,7 @@ function frame(now){
   }
   requestAnimationFrame(frame);
 }
-window.sansa = {tomato:() => [TOMATO.x,TOMATO.z], heart:() => performance.now()/1000-heartT,catGo:() => { const c = animals.find(a => a.cat); c.wait = 0; c.way = [[c.x+Math.sin(c.h)*30,c.z-Math.cos(c.h)*30]]; },catH:() => { const c = animals.find(a => a.cat); return c ? [c.x,c.z,c.h,c.v||0] : null; },catReact:k => { const c = animals.find(a => a.cat); petRabbit.__k = k; const R = Math.random; Math.random = () => (k-1)/4+.01; petRabbit(c); Math.random = R; },catPos:() => { const c = animals.find(a => a.cat); return c ? [c.x,c.z] : null; },bench:i => { const b = BENCHES[i], l = seatAt(b,-1), r = seatAt(b,1); return {x:b.x,z:b.z,h:b.h,lx:l[0],lz:l[1],rx:r[0],rz:r[1]}; },ballPos:() => [Math.round(ball.x*10)/10,Math.round(ball.z*10)/10],me:() => [cam.x,cam.z],deer:() => spawnAnimal('deer'), rabbit:() => spawnAnimal('rabbit'), head:() => cam.head*180/Math.PI,walker:(off) => { const sec = seoulSec(Date.now()+previewH*36e5); return sec>=23*3600 ? loopAt((sec-23*3600)*1.1+LOOP.len/2+(off||0)) : loopAt((sec-(sec>=18*3600?18:12)*3600)*.9+(off||0)); },birds:() => birds.map(b => [b.x,b.y,b.z]),lie:() => setLie(true), bird:() => { nextBird = 0; }, ball:(x,z,vx,vz) => { ball.x = x; ball.z = z; ball.vx = vx||0; ball.vz = vz||0; },animal:() => { nextAnimal = 0; }, animals:() => animals.map(a => [a.deer,Math.round(a.x),Math.round(a.z),a.wait>0]), view:t => { third = t; },preview:h => { previewH = h; }, weather:k => { wxKey = k; cur.cover = WX[k].cover; cur.fog = WX[k].fog; cur.rain = WX[k].rain; cur.snow = WX[k].snow; cur.snowGround = WX[k].snow; },
+window.sansa = {tomato:() => [TOMATO.x,TOMATO.z], heart:() => performance.now()/1000-heartT,catGo:() => { const c = animals.find(a => a.cat); c.wait = 0; c.way = [[c.x+Math.sin(c.h)*30,c.z-Math.cos(c.h)*30]]; },catH:() => { const c = animals.find(a => a.cat); return c ? [c.x,c.z,c.h,c.v||0] : null; },catReact:k => { const c = animals.find(a => a.cat); petRabbit.__k = k; const R = Math.random; Math.random = () => (k-1)/4+.01; petRabbit(c); Math.random = R; },catPos:() => { const c = animals.find(a => a.cat); return c ? [c.x,c.z] : null; },bench:i => { const b = BENCHES[i], l = seatAt(b,-1), r = seatAt(b,1); return {x:b.x,z:b.z,h:b.h,lx:l[0],lz:l[1],rx:r[0],rz:r[1]}; },ballSet:(x,z,vx,vz) => { ball.x=x; ball.z=z; ball.vx=vx; ball.vz=vz; ball.vy=0; }, ballPos:() => [ball.inNet?1:0,Math.round(ball.x*10)/10,Math.round(ball.z*10)/10],me:() => [cam.x,cam.z],deer:() => spawnAnimal('deer'), rabbit:() => spawnAnimal('rabbit'), head:() => cam.head*180/Math.PI,walker:(off) => { const sec = seoulSec(Date.now()+previewH*36e5); return sec>=23*3600 ? loopAt((sec-23*3600)*1.1+LOOP.len/2+(off||0)) : loopAt((sec-(sec>=18*3600?18:12)*3600)*.9+(off||0)); },birds:() => birds.map(b => [b.x,b.y,b.z]),lie:() => setLie(true), bird:() => { nextBird = 0; }, ball:(x,z,vx,vz) => { ball.x = x; ball.z = z; ball.vx = vx||0; ball.vz = vz||0; },animal:() => { nextAnimal = 0; }, animals:() => animals.map(a => [a.deer,Math.round(a.x),Math.round(a.z),a.wait>0]), view:t => { third = t; },preview:h => { previewH = h; }, weather:k => { wxKey = k; cur.cover = WX[k].cover; cur.fog = WX[k].fog; cur.rain = WX[k].rain; cur.snow = WX[k].snow; cur.snowGround = WX[k].snow; },
   look:(x,z,yawDeg,pitch) => { cam.x = x; cam.z = z; cam.yaw = yawDeg*rad; cam.pitch = pitch||0; }, sun:() => sunPos(Date.now()+previewH*36e5).alt/rad};
 requestAnimationFrame(frame);
 })();
