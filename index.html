@@ -1287,8 +1287,8 @@ function drawAnimal(m,a){
     if (a.dpose!==pose){ a.dpose = pose; a.poseT = now; }
     const tt = clamp((now-(a.poseT||0))/.4,0,1), squash = 1-.16*Math.sin(Math.PI*tt);   // 자세가 바뀔 때 몸을 낮췄다 편다
     const gait = clamp((a.v||0)/1.1,0,1.4);
-    catDraws.push({x:a.x, z:a.z, h:a.h, gy, pose, squash, ph:a.ph, amp:pose==='walk' ? .42*Math.min(1,gait) : 0,
-      bob: pose==='walk' ? Math.abs(Math.sin(a.ph))*.012*gait : 0, roll: pose==='walk' ? Math.sin(a.ph)*.035*gait : 0,
+    // 다리·머리·몸통은 움직이지 않고 그대로 미끄러지듯 이동한다 (꼬리만 살랑)
+    catDraws.push({x:a.x, z:a.z, h:a.h, gy, pose, squash, ph:a.ph, amp:0, bob:0, roll:0,
       shake: rk===2 ? Math.sin(now*25)*.025 : 0});
     const at=(fx,up,rx)=>[a.x+f[0]*fx+r[0]*rx, gy+up, a.z+f[1]*fx+r[1]*rx];
     if (rk===2) for (const k of [-1,0,1]) m.seg(at(.6,.72+k*.09,-.08+k*.12),at(.76,.48+k*.09,.08+k*.12),.014,[.9,.15,.15]);   // 빨간 할퀸 자국
