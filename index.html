@@ -1634,7 +1634,7 @@ function setRest(on){
   if (on){ $('sheet').hidden = true; move.x = move.y = 0; if (sndOn) bell(); }
 }
 $('bRest').onclick = () => setRest(true); $('bUp').onclick = () => setRest(false);
-$('enter').onclick = () => { $('gate').classList.add('gone'); setSound(true); };
+$('enter').onclick = () => { $('gate').classList.add('gone'); setSound(true); window.__joinNick = nick; if (window.MP && window.MP.join) window.MP.join(nick); };
 
 /* ───────── 그리기 ───────── */
 function bindLit(buf){
@@ -1921,9 +1921,12 @@ try {
   const D = await import('https://www.gstatic.com/firebasejs/'+V+'/firebase-database.js');
   const db = D.getDatabase(initializeApp(cfg));
   const id = Math.random().toString(36).slice(2,12);
-  const me = D.ref(db,'players/'+id); D.onDisconnect(me).remove();
+  const me = D.ref(db,'players/'+id);
   const peers = new Map(); let offset = 0, gotPlayers = false; const t0 = performance.now();
-  const MP = { ok:true, id, peers, worldOk:true, animals:null, ball:null, acts:{} };
+  // 동시 접속은 20명까지. 이름이 '지니'·'두더지'인 사람은 이 수에 넣지 않고 언제나 들어온다
+  const LIMIT = 20, VIP = ['지니','두더지'];
+  const isVip = n => VIP.includes(String(n||'').trim());
+  const MP = { ok:false, id, peers, worldOk:true, animals:null, ball:null, acts:{} };
   const failWorld = e => { console.warn('동물·공 공유를 쓰지 못해 각자 화면에서 움직입니다:', e); MP.worldOk = false; };
   D.onValue(D.ref(db,'.info/serverTimeOffset'), s => { offset = s.val()||0; });
   D.onValue(D.ref(db,'players'), snap => {
@@ -1963,9 +1966,27 @@ try {
   let hideT = null;
   document.addEventListener('visibilitychange', () => {
     if (document.hidden){ clearTimeout(hideT); hideT = setTimeout(() => { MP.offline = true; gotPlayers = false; peers.clear(); D.goOffline(db); }, 60000); }
-    else { clearTimeout(hideT); if (MP.offline){ D.goOnline(db); D.onDisconnect(me).remove(); sent = null; t0r = performance.now(); MP.offline = false; } }
+    else { clearTimeout(hideT); if (MP.offline && MP.joined){ D.goOnline(db); MP.offline = false; MP.ok = false; MP.joined = false; sent = null; t0r = performance.now(); MP.join(myNick); } }
   });
+  // 들어서기를 누르면 자리가 있는지 보고 들어간다. 자리가 없으면 혼자 걷기로 두고 연결을 끊는다
+  let myNick = '';
+  MP.join = nick => {
+    myNick = nick;
+    const tryJoin = () => {
+      if (!gotPlayers){ setTimeout(tryJoin, 300); return; }
+      const now = Date.now()+offset, others = [...peers.values()].filter(p => now-(p.t||0)<=45000 && !isVip(p.n)).length;
+      if (!isVip(nick) && others>=LIMIT){
+        MP.ok = false; MP.full = true; D.goOffline(db); peers.clear();
+        const t = document.getElementById('toast'); if (t){ t.textContent = '지금 '+LIMIT+'명이 함께 걷고 있어 혼자 걷기로 들어왔어요'; t.classList.add('on'); setTimeout(() => t.classList.remove('on'), 6000); }
+        const l = document.getElementById('mpline'); if (l){ l.hidden = false; l.textContent = '함께 걷기 자리가 다 찼어요 ('+LIMIT+'명)'; }
+        return;
+      }
+      D.onDisconnect(me).remove(); MP.joined = true; MP.ok = true;
+    };
+    tryJoin();
+  };
   window.MP = MP;
+  if (window.__joinNick!==undefined) MP.join(window.__joinNick);
   addEventListener('pagehide', () => { D.remove(me); });
 } catch(e){ console.warn('함께 걷기에 연결하지 못해 혼자 걷기로 둡니다:', e); }
 </script>
