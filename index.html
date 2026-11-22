@@ -112,6 +112,12 @@ body.mp .toast{top:168px}
   font-family:var(--display);font-size:17px;font-weight:700}
 .gate .chip{color:var(--text)}
 .gate .chip[aria-pressed="true"]{color:var(--ink)}
+.queue{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(14,21,23,.78);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:5}
+.queue[hidden]{display:none}
+.queue>div{max-width:360px;display:flex;flex-direction:column;gap:12px;align-items:center;text-align:center}
+.queue .eyebrow{font-size:13px;letter-spacing:.06em;color:var(--jade)}
+.queue .qpos{font-family:var(--display);font-size:28px;font-weight:700;font-variant-numeric:tabular-nums}
+.queue .qnote{font-size:14px;line-height:1.6;color:var(--muted)}
 .fail{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;line-height:1.6}
 @media (prefers-reduced-motion:reduce){.rest .ring{animation:none}.gate,.hint{transition:none}}
 </style>
@@ -166,6 +172,13 @@ body.mp .toast{top:168px}
   <button id="bUp" type="button">일어나기</button>
 </div>
 
+<div class="queue" id="queue" hidden>
+  <div>
+    <p class="eyebrow">함께 걷기 대기 중</p>
+    <p class="qpos" id="qpos">순서를 확인하고 있어요</p>
+    <p class="qnote">지금 20명이 함께 걷고 있어요. 자리가 나면 순서대로 자동으로 들어갑니다. 이 화면을 닫지 말고 기다려 주세요.</p>
+  </div>
+</div>
 <div class="gate" id="gate">
   <div>
     <p class="eyebrow">국민건강보험공단 인재개발원 · 제천 청풍호</p>
@@ -1968,23 +1981,43 @@ try {
     if (document.hidden){ clearTimeout(hideT); hideT = setTimeout(() => { MP.offline = true; gotPlayers = false; peers.clear(); D.goOffline(db); }, 60000); }
     else { clearTimeout(hideT); if (MP.offline && MP.joined){ D.goOnline(db); MP.offline = false; MP.ok = false; MP.joined = false; sent = null; t0r = performance.now(); MP.join(myNick); } }
   });
-  // 들어서기를 누르면 자리가 있는지 보고 들어간다. 자리가 없으면 혼자 걷기로 두고 연결을 끊는다
-  let myNick = '';
+  // 들어서기를 누르면 자리가 있는지 본다. 자리가 없으면 대기열(queue)에 올리고, 자리가 나면 먼저 온 순서대로 들어간다
+  let myNick = '', queue = {}, queueOk = true, waiting = false, qBeat = null;
+  const myQ = D.ref(db,'queue/'+id);
+  D.onValue(D.ref(db,'queue'), s => { queue = s.val()||{}; if (waiting) checkTurn(); }, () => { queueOk = false; });
+  const regulars = () => { const now = Date.now()+offset; return [...peers.values()].filter(p => now-(p.t||0)<=45000 && !isVip(p.n)).length; };
+  function admit(){
+    waiting = false; clearInterval(qBeat); D.remove(myQ).catch(() => {});
+    D.onDisconnect(me).remove(); MP.joined = true; MP.ok = true; MP.waiting = false;
+    const q = document.getElementById('queue'); if (q) q.hidden = true;
+    const t = document.getElementById('toast'); if (t){ t.textContent = '함께 걷기에 들어왔어요'; t.classList.add('on'); setTimeout(() => t.classList.remove('on'), 4000); }
+  }
+  function checkTurn(){
+    if (!waiting) return;
+    const free = LIMIT-regulars(), now = Date.now()+offset;
+    // 나보다 먼저 줄 선 사람 수 (45초 넘게 신호가 없는 사람은 뺀다)
+    const mine = queue[id] && queue[id].t ? queue[id].t : now;
+    const ahead = queueOk ? Object.entries(queue).filter(([k,q]) => k!==id && q && now-(q.b||q.t||0)<=45000 && ((q.t||0)<mine || ((q.t||0)===mine && k<id))).length : 0;
+    const el = document.getElementById('qpos');
+    if (free>ahead){ admit(); return; }
+    if (el) el.textContent = ahead>0 ? '앞에 '+ahead+'명이 기다리고 있어요' : '곧 들어갈 차례예요';
+  }
   MP.join = nick => {
     myNick = nick;
     const tryJoin = () => {
       if (!gotPlayers){ setTimeout(tryJoin, 300); return; }
-      const now = Date.now()+offset, others = [...peers.values()].filter(p => now-(p.t||0)<=45000 && !isVip(p.n)).length;
-      if (!isVip(nick) && others>=LIMIT){
-        MP.ok = false; MP.full = true; D.goOffline(db); peers.clear();
-        const t = document.getElementById('toast'); if (t){ t.textContent = '지금 '+LIMIT+'명이 함께 걷고 있어 혼자 걷기로 들어왔어요'; t.classList.add('on'); setTimeout(() => t.classList.remove('on'), 6000); }
-        const l = document.getElementById('mpline'); if (l){ l.hidden = false; l.textContent = '함께 걷기 자리가 다 찼어요 ('+LIMIT+'명)'; }
-        return;
-      }
-      D.onDisconnect(me).remove(); MP.joined = true; MP.ok = true;
+      if (isVip(nick) || regulars()<LIMIT && !Object.keys(queue).some(k => k!==id && Date.now()+offset-(queue[k].b||queue[k].t||0)<=45000)){ admit(); return; }
+      waiting = true; MP.waiting = true;
+      const q = document.getElementById('queue'); if (q) q.hidden = false;
+      D.onDisconnect(myQ).remove();
+      D.set(myQ, {n:String(nick).slice(0,10), t:D.serverTimestamp(), b:D.serverTimestamp()}).catch(() => { queueOk = false; });
+      qBeat = setInterval(() => { D.update(myQ, {b:D.serverTimestamp()}).catch(() => {}); checkTurn(); }, 5000);
+      checkTurn();
     };
     tryJoin();
   };
+  // 사람이 나가면 대기 중인 사람이 바로 들어갈 수 있게 다시 본다
+  D.onValue(D.ref(db,'players'), () => { if (waiting) setTimeout(checkTurn, 50); });
   window.MP = MP;
   if (window.__joinNick!==undefined) MP.join(window.__joinNick);
   addEventListener('pagehide', () => { D.remove(me); });
