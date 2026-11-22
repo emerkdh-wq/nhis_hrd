@@ -1151,7 +1151,7 @@ function ensureCat(){ if (!animals.some(a => a.cat)) animals.push(makeCat()); }
 function releaseDeer(a){ a.ridden = false; a.v = 0; a.flee = false; a.wait = 1.2; a.way = [[48, clamp(a.z,-22,22)], [60, -40+Math.random()*20]]; }
 function animalFrom(o,keep){
   const a = keep || {id:o.id, ph:Math.random()*6, x:o.x, z:o.z, h:o.h||0, way:[], wait:0, flee:false, v:0};
-  a.deer = !!o.d; a.cat = !!o.c; a.tx = o.x; a.tz = o.z; a.th = o.h||0; a.tv = o.v||0; a.tr = !!o.r; a.tp = !!o.p;
+  a.deer = !!o.d; a.cat = !!o.c; a.tk = o.k||0; a.tx = o.x; a.tz = o.z; a.th = o.h||0; a.tv = o.v||0; a.tr = !!o.r; a.tp = !!o.p;
   if (o.w) a.way = o.w.map(q => [q[0],q[1]]); a.wait = o.t||0; a.flee = !!o.f; return a;
 }
 function syncAnimals(dt,MP){
@@ -1169,6 +1169,7 @@ function syncAnimals(dt,MP){
     const mv = Math.hypot(a.x-ox,a.z-oz); a.v = a.tv; a.ph += mv*(a.deer?1.5:a.cat?9:2.8); a.sitT = a.v>0 ? 0 : (a.sitT||0)+dt;
     a.ridden = a.tr || riding===a;
     if (a.tp && !(a.pet>0)) a.pet = 2.6; else if (a.pet>0) a.pet -= dt;
+    if (a.react && a.react.t>0) a.react.t -= dt;
   }
   if (animalsSynced){
     if (newDeer) toast('고라니가 나타났어요', newDeer);
@@ -1191,13 +1192,15 @@ function stepAnimals(dt,time){
   if (time>nextAnimal){ spawnAnimal(); nextAnimal = time + 22 + Math.random()*40; }
   for(let i=animals.length-1;i>=0;i--){
     const a = animals[i];
-    if (a.cat){ if (a.way.length<2) a.way.push(catWay(),catWay()); a.flee = false; a.sitT = a.v>0 ? 0 : (a.sitT||0)+dt; }
+    if (a.cat){ if (a.way.length<2) a.way.push(catWay(),catWay()); a.flee = false; a.sitT = a.v>0 ? 0 : (a.sitT||0)+dt;
+      if (a.react && a.react.t>0){ a.react.t -= dt; if (a.react.k!==4) a.wait = Math.max(a.wait,.3); }
+      if (a.runT>0) a.runT -= dt; }
     if (net){   // 다른 사람이 타거나 쓰다듬은 것을 반영한다
       const act = (MP.acts||{})[a.id]||{}, rideBy = act.ride && (act.ride===MP.id || MP.peers.has(act.ride)) ? act.ride : null;
       const want = riding===a || !!rideBy;
       if (a.ridden && !want) releaseDeer(a);
       a.ridden = want;
-      if (act.pet && act.pet!==a.petSeen){ a.petSeen = act.pet; if (act.by!==MP.id){ a.pet = 2.6; a.wait = Math.max(a.wait,3); } }
+      if (act.pet && act.pet!==a.petSeen){ a.petSeen = act.pet; if (act.by!==MP.id){ if (a.cat) catReact(a,act.re|0); else { a.pet = 2.6; a.wait = Math.max(a.wait,3); } } }
     }
     if (a.ridden && a.way.length<3) a.way = [[-30+Math.random()*55,-44+Math.random()*88],[-30+Math.random()*55,-44+Math.random()*88],[-30+Math.random()*55,-44+Math.random()*88]].concat(a.way.slice(-2));
     const w2 = a.way[0];
@@ -1206,12 +1209,12 @@ function stepAnimals(dt,time){
     const near = !a.cat && !a.ridden && !(a.pet>0) && Math.hypot(a.x-cam.x,a.z-cam.z)<9 && keys.ShiftLeft && !riding && !follow;
     if (near && !a.flee){ a.flee = true; a.wait = 0; a.way = a.way.slice(-2); }
     if (a.wait>0 && !a.flee){ a.wait -= dt; a.v = 0; continue; }
-    const dx = w2[0]-a.x, dz = w2[1]-a.z, d = Math.hypot(dx,dz), sp = a.cat ? 1.1 : (a.deer?7.5:4.6)*(a.flee?1.5:1);
+    const dx = w2[0]-a.x, dz = w2[1]-a.z, d = Math.hypot(dx,dz), sp = a.cat ? (a.runT>0 ? 6.5 : 1.1) : (a.deer?7.5:4.6)*(a.flee?1.5:1);
     if (d<.8){ a.way.shift(); if (a.cat) a.wait = 3+Math.random()*9; else if (a.way.length>2 && !a.flee) a.wait = 1.5+Math.random()*4; continue; }
     const th = Math.atan2(dx,-dz); let dh = th-a.h; dh = Math.atan2(Math.sin(dh),Math.cos(dh)); a.h += dh*Math.min(1,dt*6);
     a.x += Math.sin(a.h)*sp*dt; a.z -= Math.cos(a.h)*sp*dt; a.v = sp; a.ph += dt*(a.cat?8:a.deer?11:13)*(a.flee?1.3:1);
   }
-  if (net) MP.pubAnimals(animals.map(a => ({id:a.id, d:a.deer?1:0, c:a.cat?1:0, x:r1(a.x), z:r1(a.z), h:Math.round(a.h*100)/100, v:a.wait>0&&!a.flee?0:r1(a.v),
+  if (net) MP.pubAnimals(animals.map(a => ({id:a.id, d:a.deer?1:0, c:a.cat?1:0, k:a.react&&a.react.t>0?a.react.k:0, x:r1(a.x), z:r1(a.z), h:Math.round(a.h*100)/100, v:a.wait>0&&!a.flee?0:r1(a.v),
     p:a.pet>0?1:0, r:a.ridden?1:0, w:a.way.map(q => [r1(q[0]),r1(q[1])]), t:r1(Math.max(0,a.wait)), f:a.flee?1:0})));
 }
 function drawAnimal(m,a){
@@ -1230,8 +1233,18 @@ function drawAnimal(m,a){
       const q0=at(-.34,.5,sd), q1=at(-.34+s2*.32,.02-b,sd); q1[1]=Math.max(q1[1],gy); m.seg(q0,q1,.04,[.5,.38,.25]);
     }
   } else if (a.cat){   // 치즈냥이: 주황 줄무늬, 하얀 가슴, 꼬리를 세우고 걷는다
-    const step = moving ? Math.sin(a.ph) : 0, sit = !moving && a.sitT>1.2, col = [.93,.6,.25], dark = [.78,.44,.14], wht = [.97,.94,.88];
+    const rk = a.react && a.react.t>0 ? a.react.k : (a.tk||0);   // 1 배 뒤집기, 2 할퀴기, 3 가만히, 4 도망
+    const step = moving ? Math.sin(a.ph) : 0, sit = !moving && (a.sitT>1.2 || rk===2 || rk===3), col = [.93,.6,.25], dark = [.78,.44,.14], wht = [.97,.94,.88];
     const at=(fx,up,rx)=>[a.x+f[0]*fx+r[0]*rx, gy+up, a.z+f[1]*fx+r[1]*rx];
+    if (rk===1){   // 등을 대고 누워 하얀 배를 보이고, 네 발을 허공에 꼼지락댄다
+      const wig = Math.sin(performance.now()/120)*.03;
+      const bd = at(0,.1,0); m.blob(bd[0],bd[1],bd[2],.2,.09,.1,col,5);
+      const bl = at(.02,.17,0); m.blob(bl[0],bl[1],bl[2],.14,.04,.07,wht,9);
+      for (const sd of [-1,1]){ m.seg(at(.1,.14,sd*.05),at(.13+wig,.32,sd*.07),.025,wht); m.seg(at(-.1,.14,sd*.05),at(-.13-wig,.3,sd*.07),.027,col); }
+      m.seg(at(-.18,.08,0),at(-.38,.05,.08),.025,col);
+      const hd = at(.25,.1,0); m.blob(hd[0],hd[1],hd[2],.085,.075,.08,col,6);
+      for (const sd of [-1,1]){ const e0 = at(.3,.08,sd*.045), e1 = at(.36,.04,sd*.06); m.seg(e0,e1,.022,col); }
+    } else {
     if (sit){
       const bd = at(-.04,.17,0); m.blob(bd[0],bd[1],bd[2],.13,.15,.11,col,5);
       const ch = at(.06,.18,0); m.blob(ch[0],ch[1],ch[2],.07,.1,.07,wht,9);
@@ -1250,7 +1263,10 @@ function drawAnimal(m,a){
     const hy = sit ? .38 : .3, hx = sit ? .06 : .21, hd = at(hx,hy,0);
     m.blob(hd[0],hd[1],hd[2],.085,.075,.08,col,6);
     const mz = at(hx+.06,hy-.025,0); m.blob(mz[0],mz[1],mz[2],.035,.03,.04,wht,8);
-    for (const sd of [-1,1]){ const e0 = at(hx-.01,hy+.05,sd*.045), e1 = at(hx-.02,hy+.12,sd*.055); m.seg(e0,e1,.022,col); }
+    for (const sd of [-1,1]){ const e0 = at(hx-.01,hy+.05,sd*.045), e1 = rk===2 ? at(hx-.09,hy+.07,sd*.08) : at(hx-.02,hy+.12,sd*.055); m.seg(e0,e1,.022,col); }   // 할퀼 때는 귀를 뒤로 젖힌다
+    if (rk===2){ const sw = Math.sin(performance.now()/70); m.seg(at(.08,.22,.05),at(.26,.3+sw*.08,.06+sw*.06),.026,wht);   // 앞발을 휘두른다
+      for (const k of [-1,0,1]) m.seg(at(.34,.42+k*.05,-.04+k*.06),at(.42,.3+k*.05,.04+k*.06),.008,[.9,.15,.15]); }   // 빨간 할퀸 자국
+    }
     if (a.pet>0) for(let k=0;k<3;k++){ const u = ((2.6-a.pet)*.55+k/3)%1, hx2 = a.x+Math.sin(k*2.1+u*4)*.18, hz2 = a.z+Math.cos(k*2.1)*.12, hy2 = gy+.65+u*.9, hs = .07*(1-u*.4);
       for(const sd of [-1,1]) m.blob(hx2+r[0]*sd*hs*.6,hy2,hz2+r[1]*sd*hs*.6,hs*.7,hs*.7,hs*.7,[1,.38,.55],k);
       m.blob(hx2,hy2-hs*.6,hz2,hs*.55,hs*.6,hs*.55,[1,.38,.55],k+3); }
@@ -1491,7 +1507,26 @@ $('bFollow').onclick = () => {
   let best = 1e9; for (const a of animals){ if (a.ridden) continue; const d = Math.hypot(a.x-cam.x,a.z-cam.z); if (d<best){ best = d; follow = a; } }
   firstTouch();
 };
-function petRabbit(a){ if (netOn()) window.MP.act(a.id,{pet:Date.now()}); petting = {a, t:2.6}; a.pet = 2.6; a.wait = Math.max(a.wait,3); cam.head = Math.atan2(a.x-cam.x,-(a.z-cam.z)); if (sndOn){ if (a.cat){ tone(740,.03,.35); tone(560,.025,.5,.25); } else { tone(1568,.03,1.2); tone(2093,.025,1.4,.18); } } firstTouch(); }
+// 고양이 반응: 대표 화면이 실제로 움직이고, 쓰다듬은 사람 화면은 바로 보여 준다
+function catReact(a,k){
+  a.react = {k, t:k===4 ? 1 : 2.8};
+  if (k===1 || k===3){ a.pet = 2.6; a.wait = Math.max(a.wait,3); }
+  if (k===2){ a.wait = Math.max(a.wait,1.8); }
+  if (k===4){ a.wait = 0; a.runT = 2.6; const ang = Math.atan2(a.x-cam.x,-(a.z-cam.z)); a.way = [[clamp(a.x+Math.sin(ang)*16,-32,36), clamp(a.z-Math.cos(ang)*16,-50,50)], catWay(), catWay()]; }
+}
+function petRabbit(a){
+  if (a.cat){
+    const k = 1+Math.floor(Math.random()*4);
+    if (netOn()) window.MP.act(a.id,{pet:Date.now(), re:k});
+    if (!netOn() || window.MP.leader()) catReact(a,k); else a.react = {k, t:2.8};
+    cam.head = Math.atan2(a.x-cam.x,-(a.z-cam.z)); firstTouch();
+    if (k===1){ petting = {a, t:2.6}; toast('치즈냥이가 배를 보여 줘요'); if (sndOn){ tone(740,.03,.35); tone(560,.025,.5,.25); } }
+    else if (k===2){ petting = {a, t:.7}; toast('앗, 할퀴었어요!'); if (sndOn){ tone(1200,.04,.12); tone(900,.03,.2,.1); } }
+    else if (k===3){ petting = {a, t:2.6}; if (sndOn){ tone(740,.03,.35); tone(560,.025,.5,.25); } }
+    else { petting = null; toast('치즈냥이가 도망갔어요'); if (sndOn) tone(1400,.03,.15); }
+    return;
+  }
+  if (netOn()) window.MP.act(a.id,{pet:Date.now()}); petting = {a, t:2.6}; a.pet = 2.6; a.wait = Math.max(a.wait,3); cam.head = Math.atan2(a.x-cam.x,-(a.z-cam.z)); if (sndOn){ if (a.cat){ tone(740,.03,.35); tone(560,.025,.5,.25); } else { tone(1568,.03,1.2); tone(2093,.025,1.4,.18); } } firstTouch(); }
 function deerTaken(a){
   if (a.ridden && riding!==a) return true;
   const MP = window.MP; if (!MP || !MP.ok) return false;
@@ -1801,7 +1836,7 @@ function frame(now){
   }
   requestAnimationFrame(frame);
 }
-window.sansa = {catPos:() => { const c = animals.find(a => a.cat); return c ? [c.x,c.z] : null; },bench:i => { const b = BENCHES[i], l = seatAt(b,-1), r = seatAt(b,1); return {x:b.x,z:b.z,h:b.h,lx:l[0],lz:l[1],rx:r[0],rz:r[1]}; },ballPos:() => [Math.round(ball.x*10)/10,Math.round(ball.z*10)/10],me:() => [cam.x,cam.z],deer:() => spawnAnimal('deer'), rabbit:() => spawnAnimal('rabbit'), head:() => cam.head*180/Math.PI,walker:(off) => { const sec = seoulSec(Date.now()+previewH*36e5); return sec>=23*3600 ? loopAt((sec-23*3600)*1.1+LOOP.len/2+(off||0)) : loopAt((sec-(sec>=18*3600?18:12)*3600)*.9+(off||0)); },birds:() => birds.map(b => [b.x,b.y,b.z]),lie:() => setLie(true), bird:() => { nextBird = 0; }, ball:(x,z,vx,vz) => { ball.x = x; ball.z = z; ball.vx = vx||0; ball.vz = vz||0; },animal:() => { nextAnimal = 0; }, animals:() => animals.map(a => [a.deer,Math.round(a.x),Math.round(a.z),a.wait>0]), view:t => { third = t; },preview:h => { previewH = h; }, weather:k => { wxKey = k; cur.cover = WX[k].cover; cur.fog = WX[k].fog; cur.rain = WX[k].rain; cur.snow = WX[k].snow; cur.snowGround = WX[k].snow; },
+window.sansa = {catReact:k => { const c = animals.find(a => a.cat); petRabbit.__k = k; const R = Math.random; Math.random = () => (k-1)/4+.01; petRabbit(c); Math.random = R; },catPos:() => { const c = animals.find(a => a.cat); return c ? [c.x,c.z] : null; },bench:i => { const b = BENCHES[i], l = seatAt(b,-1), r = seatAt(b,1); return {x:b.x,z:b.z,h:b.h,lx:l[0],lz:l[1],rx:r[0],rz:r[1]}; },ballPos:() => [Math.round(ball.x*10)/10,Math.round(ball.z*10)/10],me:() => [cam.x,cam.z],deer:() => spawnAnimal('deer'), rabbit:() => spawnAnimal('rabbit'), head:() => cam.head*180/Math.PI,walker:(off) => { const sec = seoulSec(Date.now()+previewH*36e5); return sec>=23*3600 ? loopAt((sec-23*3600)*1.1+LOOP.len/2+(off||0)) : loopAt((sec-(sec>=18*3600?18:12)*3600)*.9+(off||0)); },birds:() => birds.map(b => [b.x,b.y,b.z]),lie:() => setLie(true), bird:() => { nextBird = 0; }, ball:(x,z,vx,vz) => { ball.x = x; ball.z = z; ball.vx = vx||0; ball.vz = vz||0; },animal:() => { nextAnimal = 0; }, animals:() => animals.map(a => [a.deer,Math.round(a.x),Math.round(a.z),a.wait>0]), view:t => { third = t; },preview:h => { previewH = h; }, weather:k => { wxKey = k; cur.cover = WX[k].cover; cur.fog = WX[k].fog; cur.rain = WX[k].rain; cur.snow = WX[k].snow; cur.snowGround = WX[k].snow; },
   look:(x,z,yawDeg,pitch) => { cam.x = x; cam.z = z; cam.yaw = yawDeg*rad; cam.pitch = pitch||0; }, sun:() => sunPos(Date.now()+previewH*36e5).alt/rad};
 requestAnimationFrame(frame);
 })();
