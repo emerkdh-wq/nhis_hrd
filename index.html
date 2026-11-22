@@ -1235,6 +1235,18 @@ function publishAnimals(MP,time){
   for (const id of [...pubSt.keys()]) if (!animals.some(a => a.id===id)){ ch[id] = null; pubSt.delete(id); any = true; }
   if (any) MP.pubAnimals(ch);
 }
+// 치즈냥이 모델: [모델의 앞 방향 축, 바닥 높이(모델 좌표), 크기]. walk·sit는 앞이 +z, belly는 머리가 -x
+const CATM = {}, catDraws = [];
+const CAT_SPEC = {walk:{file:'cat_walk.glb', id:'cwdata', front:'z', ymin:-.65, s:.3}, sit:{file:'cat_sit.glb', id:'csdata', front:'z', ymin:-.95, s:.2}, belly:{file:'cat_belly.glb', id:'cbdata', front:'-x', ymin:-.37, s:.29}};
+function catMatrix(d){
+  const sp = CAT_SPEC[d.pose], s = sp.s, f = [Math.sin(d.h),0,-Math.cos(d.h)], r = [Math.cos(d.h),0,Math.sin(d.h)];
+  // 모델 축이 세상의 어느 방향으로 가는지: (x축, z축)
+  const ax = sp.front==='z' ? [-r[0],0,-r[2]] : [-f[0],0,-f[2]], az = sp.front==='z' ? f : [-r[0],0,-r[2]];
+  const tx = d.x+r[0]*d.shake, tz = d.z+r[2]*d.shake, ty = d.gy - sp.ymin*s + d.bob;
+  return new Float32Array([ax[0]*s,0,ax[2]*s,0, 0,s,0,0, az[0]*s,0,az[2]*s,0, tx,ty,tz,1]);
+}
+for (const k in CAT_SPEC){ const sp = CAT_SPEC[k];
+  loadModel(sp.file, sp.id, (x,y,z) => [x,y,z], (x,y,z) => [x,y,z], () => 0).then(m => { CATM[k] = m; }).catch(e => console.warn('치즈냥이 모델('+k+')을 불러오지 못해 단순 모형을 씁니다:', e)); }
 function drawAnimal(m,a){
   const f=[Math.sin(a.h),-Math.cos(a.h)], r=[Math.cos(a.h),Math.sin(a.h)], moving = a.v>0;
   const gy = a.x>41 ? H(a.x,a.z)+.1 : .04;
@@ -1250,6 +1262,14 @@ function drawAnimal(m,a){
       const p0=at(.26,.5,sd), p1=at(.26+s1*.3,.02-b,sd); p1[1]=Math.max(p1[1],gy); m.seg(p0,p1,.035,[.5,.38,.25]);
       const q0=at(-.34,.5,sd), q1=at(-.34+s2*.32,.02-b,sd); q1[1]=Math.max(q1[1],gy); m.seg(q0,q1,.04,[.5,.38,.25]);
     }
+  } else if (a.cat && CATM.walk && CATM.sit && CATM.belly){   // 치즈냥이 3D 모델 (힉스필드)
+    const rk = a.react && a.react.t>0 ? a.react.k : (a.tk||0), sit = !moving && (a.sitT>1.2 || rk===2 || rk===3);
+    catDraws.push({x:a.x, z:a.z, h:a.h, gy, pose: rk===1 ? 'belly' : sit ? 'sit' : 'walk', bob: moving ? Math.abs(Math.sin(a.ph))*.025 : 0, shake: rk===2 ? Math.sin(performance.now()/40)*.025 : 0});
+    const at=(fx,up,rx)=>[a.x+f[0]*fx+r[0]*rx, gy+up, a.z+f[1]*fx+r[1]*rx];
+    if (rk===2) for (const k of [-1,0,1]) m.seg(at(.3,.36+k*.05,-.04+k*.06),at(.38,.24+k*.05,.04+k*.06),.008,[.9,.15,.15]);   // 빨간 할퀸 자국
+    if (a.pet>0) for(let k=0;k<3;k++){ const u = ((2.6-a.pet)*.55+k/3)%1, hx2 = a.x+Math.sin(k*2.1+u*4)*.18, hz2 = a.z+Math.cos(k*2.1)*.12, hy2 = gy+.6+u*.9, hs = .07*(1-u*.4);
+      for(const sd of [-1,1]) m.blob(hx2+r[0]*sd*hs*.6,hy2,hz2+r[1]*sd*hs*.6,hs*.7,hs*.7,hs*.7,[1,.38,.55],k);
+      m.blob(hx2,hy2-hs*.6,hz2,hs*.55,hs*.6,hs*.55,[1,.38,.55],k+3); }
   } else if (a.cat){   // 치즈냥이: 주황 줄무늬, 하얀 가슴, 꼬리를 세우고 걷는다
     const rk = a.react && a.react.t>0 ? a.react.k : (a.tk||0);   // 1 배 뒤집기, 2 할퀴기, 3 가만히, 4 도망
     const step = moving ? Math.sin(a.ph) : 0, sit = !moving && (a.sitT>1.2 || rk===2 || rk===3), col = [.93,.6,.25], dark = [.78,.44,.14], wht = [.97,.94,.88];
@@ -1770,6 +1790,8 @@ function frame(now){
   if (torch.length) lampFlat.set(torch[1],36);   // 테니스 조명이 꺼진 시간이라 그 자리를 손전등 빛으로 쓴다
   gl.bindBuffer(gl.ARRAY_BUFFER,gondB); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(gm.a),gl.DYNAMIC_DRAW);
   drawLit({b:gondB,n:gm.a.length/11});
+  for (const d of catDraws){ const M = CATM[d.pose]; drawLit(M.buf,M.t,T.black,catMatrix(d)); }
+  catDraws.length = 0;
 
   // 호수
   gl.useProgram(WAT.p); setAttribs(1);
