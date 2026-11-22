@@ -804,7 +804,6 @@ T.fence = meshTex('rgba(70,170,105,.95)',5);
   const notes = [['#fff4a8',70,60,-.08],['#ffd0dc',800,52,.07],['#cfe8ff',96,250,.05],['#d8f5c8',300,190,-.04],['#fff4a8',520,200,.06],['#ffd0dc',740,250,-.06],['#cfe8ff',420,330,-.03],['#fff',870,330,.08],['#d8f5c8',150,380,-.07]];
   for (const [col,nx,ny,r] of notes){ x.save(); x.translate(nx+70,ny+60); x.rotate(r); x.fillStyle = 'rgba(0,0,0,.18)'; x.fillRect(-66,-54,140,120); x.fillStyle = col; x.fillRect(-70,-60,140,120);
     x.fillStyle = 'rgba(60,60,80,.55)'; for (let l=0;l<4;l++) x.fillRect(-54,-34+l*24,90+rnd()*20-(l===3?40:0),5); x.fillStyle = '#c0392b'; x.beginPath(); x.arc(0,-50,7,0,6.283); x.fill(); x.restore(); }
-  x.fillStyle = '#f4efe2'; x.font = '30px sans-serif'; x.fillText('가까이 와서 한마디 남겨 주세요',512,478);
   T.board = tex(c,false); } T.net = meshTex('rgba(245,245,240,.9)',4);
 
 /* ───────── 셰이더 ───────── */
