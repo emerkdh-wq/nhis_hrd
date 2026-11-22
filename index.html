@@ -1462,7 +1462,13 @@ $('bFollow').onclick = () => {
   firstTouch();
 };
 function petRabbit(a){ if (netOn()) window.MP.act(a.id,{pet:Date.now()}); petting = {a, t:2.6}; a.pet = 2.6; a.wait = Math.max(a.wait,3); cam.head = Math.atan2(a.x-cam.x,-(a.z-cam.z)); if (sndOn){ tone(1568,.03,1.2); tone(2093,.025,1.4,.18); } firstTouch(); }
-function mountDeer(a){ standUp(); if (lying) setLie(false); if (netOn()) window.MP.act(a.id,{ride:window.MP.id}); riding = a; a.ridden = true; a.wait = 0; cam.x = a.x; cam.z = a.z; cam.head = a.h; toast('고라니에 올라탔어요'); if (sndOn) chime(); firstTouch(); }
+function deerTaken(a){
+  if (a.ridden && riding!==a) return true;
+  const MP = window.MP; if (!MP || !MP.ok) return false;
+  const r = ((MP.acts||{})[a.id]||{}).ride;
+  return !!r && r!==MP.id && MP.peers.has(r);
+}
+function mountDeer(a){ if (deerTaken(a)) return; standUp(); if (lying) setLie(false); if (netOn()) window.MP.act(a.id,{ride:window.MP.id}); riding = a; a.ridden = true; a.wait = 0; cam.x = a.x; cam.z = a.z; cam.head = a.h; toast('고라니에 올라탔어요'); if (sndOn) chime(); firstTouch(); }
 function dismount(){
   const a = riding; if (!a) return; riding = null;
   cam.x = clamp(a.x+Math.cos(a.h)*1.1,-38,54.8); cam.z = clamp(a.z+Math.sin(a.h)*1.1,-55.4,55.4);
@@ -1578,8 +1584,10 @@ function frame(now){
   const nx = clamp(cam.x + vx*v, -38, 54.8), nz = clamp(cam.z + vz*v, -55.4, 55.4);
   if (!blocked(nx,cam.z)) cam.x = nx; if (!blocked(cam.x,nz)) cam.z = nz;
   if (seated>=0){ const b = BENCHES[seated], q = seatAt(b,seatSide); cam.x = q[0]+Math.sin(b.h)*.04; cam.z = q[1]-Math.cos(b.h)*.04; cam.head = b.h; }
+  if (riding && window.MP && window.MP.ok){ const r = ((window.MP.acts||{})[riding.id]||{}).ride;
+    if (r && r!==window.MP.id && window.MP.peers.has(r)){ const a = riding; riding = null; toast('다른 사람이 먼저 탔어요'); cam.x = clamp(a.x+Math.cos(a.h)*1.1,-38,54.8); cam.z = clamp(a.z+Math.sin(a.h)*1.1,-55.4,55.4); } }
   if (riding){ cam.x = riding.x; cam.z = riding.z; cam.head = riding.h; }
-  nearDeer = null; if (!riding && seated<0 && !lying){ let best = 3.2; for (const a of animals){ if (!a.deer) continue; const d = Math.hypot(a.x-cam.x,a.z-cam.z); if (d<best){ best = d; nearDeer = a; } } }
+  nearDeer = null; if (!riding && seated<0 && !lying){ let best = 3.2; for (const a of animals){ if (!a.deer || deerTaken(a)) continue; const d = Math.hypot(a.x-cam.x,a.z-cam.z); if (d<best){ best = d; nearDeer = a; } } }
   { const wv = !!(window.MP && window.MP.ok) && myPose()===0; if ($('bWave').hidden===wv) $('bWave').hidden = !wv; }
   { const any = animals.some(a => !a.ridden && a.x<54), lab = '';   // 따라가기는 '나타났어요' 알림을 눌러서 시작한다
     if (lab!==followLabel){ followLabel = lab; $('bFollow').hidden = !lab; if (lab) $('bFollow').textContent = lab; $('bFollow').setAttribute('aria-pressed', !!follow); } }
