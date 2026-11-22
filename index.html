@@ -1560,10 +1560,10 @@ function petRabbit(a){
     if (netOn()) window.MP.act(a.id,{pet:Date.now(), re:k});
     if (!netOn() || window.MP.leader()) catReact(a,k); else a.react = {k, t:2.8};
     cam.head = Math.atan2(a.x-cam.x,-(a.z-cam.z)); firstTouch();
-    if (k===1){ petting = {a, t:2.6}; toast('치즈냥이가 배를 보여 줘요'); if (sndOn){ tone(740,.03,.35); tone(560,.025,.5,.25); } }
+    if (k===1){ petting = {a, t:2.6}; toast('르샤가 배를 보여 줘요'); if (sndOn){ tone(740,.03,.35); tone(560,.025,.5,.25); } }
     else if (k===2){ petting = {a, t:.7}; toast('앗, 할퀴었어요!'); if (sndOn){ tone(1200,.04,.12); tone(900,.03,.2,.1); } }
     else if (k===3){ petting = {a, t:2.6}; if (sndOn){ tone(740,.03,.35); tone(560,.025,.5,.25); } }
-    else { petting = null; toast('치즈냥이가 도망갔어요'); if (sndOn) tone(1400,.03,.15); }
+    else { petting = null; toast('르샤가 도망갔어요'); if (sndOn) tone(1400,.03,.15); }
     return;
   }
   if (netOn()) window.MP.act(a.id,{pet:Date.now()}); petting = {a, t:2.6}; a.pet = 2.6; a.wait = Math.max(a.wait,3); cam.head = Math.atan2(a.x-cam.x,-(a.z-cam.z)); if (sndOn){ if (a.cat){ tone(740,.03,.35); tone(560,.025,.5,.25); } else { tone(1568,.03,1.2); tone(2093,.025,1.4,.18); } } firstTouch(); }
@@ -1706,7 +1706,7 @@ function frame(now){
   nearRabbit = null; if (!riding && !petting && seated<0 && !lying){ let best = 2.2; for (const a of animals){ if (a.deer) continue; const d = Math.hypot(a.x-cam.x,a.z-cam.z); if (d<best){ best = d; nearRabbit = a; } } }
   if (petting){ const a = petting.a; cam.head = Math.atan2(a.x-cam.x,-(a.z-cam.z)); }
   nearBench = -1; if (seated<0){ let best = 2.4*2.4; BENCHES.forEach((b,i) => { const d = (b.x-cam.x)**2+(b.z-cam.z)**2; if (d<best && freeSeat(b)){ best = d; nearBench = i; } }); }
-  { const lab = resting ? '' : riding ? '내리기' : (seated>=0 || lying) ? '일어나기' : petting ? '' : nearDeer ? '고라니 타기' : nearRabbit ? (nearRabbit.cat ? '치즈냥이 쓰다듬기' : '토끼 쓰다듬기') : nearBench>=0 ? '벤치에 앉기' : '';
+  { const lab = resting ? '' : riding ? '내리기' : (seated>=0 || lying) ? '일어나기' : petting ? '' : nearDeer ? '고라니 타기' : nearRabbit ? (nearRabbit.cat ? '르샤 쓰다듬기' : '토끼 쓰다듬기') : nearBench>=0 ? '벤치에 앉기' : '';
     if (lab!==sitLabel){ sitLabel = lab; $('bSit').hidden = !lab; if (lab) $('bSit').textContent = lab; $('bSit').classList.toggle('quiet', lab==='일어나기'); } }
   const gy = groundY(cam.x,cam.z);
   if (sp>.08){ let dh = Math.atan2(vx,-vz)-cam.head; dh = Math.atan2(Math.sin(dh),Math.cos(dh)); cam.head += dh*Math.min(1,dt*9); }
