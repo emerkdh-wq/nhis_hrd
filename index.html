@@ -1767,10 +1767,16 @@ function catReact(a,k){
   if (k===2){ a.wait = Math.max(a.wait,1.8); }
   if (k===4){ a.wait = 0; a.runT = 2.6; const ang = Math.atan2(a.x-cam.x,-(a.z-cam.z)); const fw = [clamp(a.x+Math.sin(ang)*16,-32,36), clamp(a.z-Math.cos(ang)*16,-50,50)]; a.way = [fw, catWay(fw)]; }
 }
+// 누군가 르샤나 토끼를 만져 반응하는 동안에는 아무도 다시 만질 수 없다
+function animalBusy(a){
+  if (a.pet>0 || a.tp || (a.react && a.react.t>0) || (a.tk|0)>0 || a.runT>0) return true;
+  if (netOn()){ const MP = window.MP, act = (MP.acts||{})[a.id]; if (act && act.pet && MP.now()-act.pet < (a.cat ? 2800 : 2600)) return true; }
+  return false;
+}
 function petRabbit(a){
   if (a.cat){
     const k = 1+Math.floor(Math.random()*4);
-    if (netOn()) window.MP.act(a.id,{pet:Date.now(), re:k});
+    if (netOn()) window.MP.act(a.id,{pet:window.MP.now(), re:k});
     if (!netOn() || window.MP.leader()) catReact(a,k); else a.react = {k, t:2.8};
     cam.head = Math.atan2(a.x-cam.x,-(a.z-cam.z)); firstTouch();
     if (k===1){ petting = {a, t:2.6}; toast('르샤가 배를 보여 줘요'); if (sndOn){ tone(740,.03,.35); tone(560,.025,.5,.25); } }
@@ -1779,7 +1785,7 @@ function petRabbit(a){
     else { petting = null; toast('르샤가 도망갔어요'); if (sndOn) tone(1400,.03,.15); }
     return;
   }
-  if (netOn()) window.MP.act(a.id,{pet:Date.now()}); petting = {a, t:2.6}; a.pet = 2.6; a.wait = Math.max(a.wait,3); cam.head = Math.atan2(a.x-cam.x,-(a.z-cam.z)); if (sndOn){ if (a.cat){ tone(740,.03,.35); tone(560,.025,.5,.25); } else { tone(1568,.03,1.2); tone(2093,.025,1.4,.18); } } firstTouch(); }
+  if (netOn()) window.MP.act(a.id,{pet:window.MP.now()}); petting = {a, t:2.6}; a.pet = 2.6; a.wait = Math.max(a.wait,3); cam.head = Math.atan2(a.x-cam.x,-(a.z-cam.z)); if (sndOn){ if (a.cat){ tone(740,.03,.35); tone(560,.025,.5,.25); } else { tone(1568,.03,1.2); tone(2093,.025,1.4,.18); } } firstTouch(); }
 function deerTaken(a){
   if (a.ridden && riding!==a) return true;
   const MP = window.MP; if (!MP || !MP.ok) return false;
@@ -1916,7 +1922,7 @@ function frame(now){
   { const wv = !!(window.MP && window.MP.ok) && myPose()===0; if ($('bWave').hidden===wv) $('bWave').hidden = !wv; }
   { const any = animals.some(a => !a.ridden && a.x<54), lab = '';   // 따라가기는 '나타났어요' 알림을 눌러서 시작한다
     if (lab!==followLabel){ followLabel = lab; $('bFollow').hidden = !lab; if (lab) $('bFollow').textContent = lab; $('bFollow').setAttribute('aria-pressed', !!follow); } }
-  nearRabbit = null; if (!riding && !petting && seated<0 && !lying){ let best = 2.2; for (const a of animals){ if (a.deer) continue; const d = Math.hypot(a.x-cam.x,a.z-cam.z); if (d<best){ best = d; nearRabbit = a; } } }
+  nearRabbit = null; if (!riding && !petting && seated<0 && !lying){ let best = 2.2; for (const a of animals){ if (a.deer || animalBusy(a)) continue; const d = Math.hypot(a.x-cam.x,a.z-cam.z); if (d<best){ best = d; nearRabbit = a; } } }
   if (petting){ const a = petting.a; cam.head = Math.atan2(a.x-cam.x,-(a.z-cam.z)); }
   nearBoard = !riding && !petting && !eating && seated<0 && !lying && !resting && $('gbook').hidden && Math.abs(cam.x-GB_AT[0])<3 && GB_AT[1]-cam.z<3.4;
   nearTomato = !riding && !petting && !eating && seated<0 && !lying && !resting && Math.hypot(cam.x-TOMATO.x,cam.z-TOMATO.z)<2.8 && TOMATO.eaten.some(t => performance.now()/1000-t>90);
