@@ -89,6 +89,10 @@ body.mp .toast{top:168px}
 .gbrow{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--muted)}
 .gbrow button{height:40px;padding:0 18px;border-radius:20px;border:0;background:var(--jade);color:#10201b;font-size:14px;font-weight:700}
 .gbrow button:disabled{opacity:.5}
+.gbitem.notice{background:rgba(143,208,184,.16);border:1px solid rgba(143,208,184,.45)}
+.gbitem.notice b{color:#10201b;background:var(--jade);padding:1px 8px;border-radius:9px;font-size:12px}
+.sheet .gbnt{justify-content:flex-start}.gbnt{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--jade)}.gbnt[hidden]{display:none}
+.gbnt input{width:18px;height:18px;accent-color:var(--jade)}
 .gbfoot{display:flex;justify-content:space-between;align-items:center}
 .gbadm{height:32px;padding:0 12px;border-radius:16px;border:1px solid var(--line);background:transparent;font-size:12px;color:var(--muted)}
 .gbadm[aria-pressed=true]{color:#f2b8b5;border-color:#f2b8b5}
@@ -189,6 +193,7 @@ body.mp .toast{top:168px}
   <h2>방명록</h2>
   <div class="gblist" id="gblist"></div>
   <textarea id="gbmsg" maxlength="120" rows="2" placeholder="한마디 남겨 주세요 (120자까지)"></textarea>
+  <label class="gbnt" id="gbNtRow" hidden><input type="checkbox" id="gbNt"> 공지로 올리기</label>
   <div class="gbrow"><span id="gbcnt">0/120</span><button id="gbsend" type="button">남기기</button></div>
   <div class="gbfoot"><button class="gbadm" id="gbAdm" type="button">관리자</button><button class="close" id="gbClose" type="button">닫기</button></div>
   <div class="gbkey" id="gbKeyRow" hidden><input id="gbKey" type="password" autocomplete="off" placeholder="관리자 비밀번호"><button id="gbKeyOk" type="button">확인</button></div>
@@ -1622,55 +1627,76 @@ syncWx(); liveWeather(); setInterval(liveWeather, 15*60*1000);
 $('bWx').onclick = () => { $('sheet').hidden = !$('sheet').hidden; };
 $('bClose').onclick = () => { $('sheet').hidden = true; };
 /* ───────── 방명록 ───────── */
-let gbOff = null, gbLast = 0, gbList = [], gbAdmin = false;
+let gbOff = null, ntOff = null, gbLast = 0, gbList = [], ntList = [], gbErr = false, gbLoaded = false, gbAdmin = false;
 const gbKey = () => store2.get('cp-gbkey','');
-function gbRender(list){
-  const el = $('gblist'); el.textContent = '';
+const gbTime = t => { if (!t) return ''; const dt = new Date(t+9*3600e3); return (dt.getUTCMonth()+1)+'월 '+dt.getUTCDate()+'일 '+String(dt.getUTCHours()).padStart(2,'0')+':'+String(dt.getUTCMinutes()).padStart(2,'0'); };
+function gbDelBtn(run,okMsg){   // 관리자 삭제 버튼: 두 번 눌러야 지워진다
+  const x = document.createElement('button'); x.type = 'button'; x.className = 'gbdel'; x.textContent = '삭제';
+  x.onclick = () => { if (!x.classList.contains('sure')){ x.classList.add('sure'); x.textContent = '정말 삭제'; setTimeout(() => { x.classList.remove('sure'); x.textContent = '삭제'; }, 3000); return; }
+    x.disabled = true; run().then(() => toast(okMsg)).catch(() => { x.disabled = false; toast('지우지 못했어요. 관리자 비밀번호를 확인해 주세요'); }); };
+  return x;
+}
+function gbDraw(){
+  const el = $('gblist'), adm = gbAdmin && gbKey(); el.textContent = '';
   const msg = t => { const p = document.createElement('p'); p.className = 'gbempty'; p.textContent = t; el.appendChild(p); };
-  if (list===null) return msg('방명록을 불러오지 못했어요. 잠시 뒤 다시 열어 주세요.');
-  gbList = list; if (!list.length) return msg('아직 남긴 글이 없어요. 첫 글을 남겨 주세요.');
-  list.sort((a,b) => (b.t||0)-(a.t||0)).forEach(e => {
+  // 공지는 맨 위에 고정한다
+  ntList.slice().sort((a,b) => (b.t||0)-(a.t||0)).forEach(e => {
+    const d = document.createElement('div'); d.className = 'gbitem notice';
+    const h = document.createElement('div'), b = document.createElement('b'), tm = document.createElement('time'), p = document.createElement('p');
+    b.textContent = '공지'; tm.textContent = gbTime(e.t); p.textContent = String(e.m||'').slice(0,200); h.append(b,tm);
+    if (adm) h.appendChild(gbDelBtn(() => window.MP.ntDel(e.k, gbKey()), '공지를 내렸어요'));
+    d.append(h,p); el.appendChild(d);
+  });
+  if (gbErr) return msg('방명록을 불러오지 못했어요. 잠시 뒤 다시 열어 주세요.');
+  if (!gbLoaded) return msg('불러오는 중이에요');
+  if (!gbList.length) return msg('아직 남긴 글이 없어요. 첫 글을 남겨 주세요.');
+  gbList.slice().sort((a,b) => (b.t||0)-(a.t||0)).forEach(e => {
     const d = document.createElement('div'); d.className = 'gbitem';
     const h = document.createElement('div'), b = document.createElement('b'), tm = document.createElement('time'), p = document.createElement('p');
-    b.textContent = String(e.n||'손님').slice(0,10);
-    const dt = new Date((e.t||0)+9*3600e3); tm.textContent = e.t ? (dt.getUTCMonth()+1)+'월 '+dt.getUTCDate()+'일 '+String(dt.getUTCHours()).padStart(2,'0')+':'+String(dt.getUTCMinutes()).padStart(2,'0') : '';
-    p.textContent = String(e.m||'').slice(0,120); h.append(b,tm);
-    if (gbAdmin && gbKey()){   // 관리자: 두 번 눌러야 지워진다
-      const x = document.createElement('button'); x.type = 'button'; x.className = 'gbdel'; x.textContent = '삭제';
-      x.onclick = () => { if (!x.classList.contains('sure')){ x.classList.add('sure'); x.textContent = '정말 삭제'; setTimeout(() => { x.classList.remove('sure'); x.textContent = '삭제'; }, 3000); return; }
-        x.disabled = true; window.MP.gbDel(e.k, gbKey()).then(() => toast('글을 지웠어요'))
-          .catch(() => { x.disabled = false; toast('지우지 못했어요. 관리자 비밀번호를 확인해 주세요'); }); };
-      h.appendChild(x); }
+    b.textContent = String(e.n||'손님').slice(0,10); tm.textContent = gbTime(e.t); p.textContent = String(e.m||'').slice(0,120); h.append(b,tm);
+    if (adm) h.appendChild(gbDelBtn(() => window.MP.gbDel(e.k, gbKey()), '글을 지웠어요'));
     d.append(h,p); el.appendChild(d);
   });
 }
+function gbSetAdmin(on){
+  gbAdmin = on; $('gbAdm').setAttribute('aria-pressed', String(on)); $('gbKeyRow').hidden = true; $('gbNtRow').hidden = !on;
+  if (!on) $('gbNt').checked = false; gbSyncMode(); gbDraw();
+}
+function gbSyncMode(){ const nt = gbAdmin && $('gbNt').checked, max = nt ? 200 : 120;
+  $('gbmsg').maxLength = max; $('gbmsg').placeholder = nt ? '공지 내용을 써 주세요 (200자까지)' : '한마디 남겨 주세요 (120자까지)';
+  $('gbsend').textContent = nt ? '공지 올리기' : '남기기'; $('gbcnt').textContent = $('gbmsg').value.length+'/'+max; }
 function openGB(){
   const MP = window.MP; $('gbook').hidden = false; $('sheet').hidden = true; move.x = move.y = 0; firstTouch();
-  $('gblist').textContent = ''; const p = document.createElement('p'); p.className = 'gbempty';
-  if (MP && MP.ok && !MP.offline && MP.gbWatch){ p.textContent = '불러오는 중이에요'; $('gblist').appendChild(p); if (gbOff) gbOff(); gbOff = MP.gbWatch(gbRender); }
-  else { p.textContent = '지금은 연결되어 있지 않아 방명록을 볼 수 없어요. 함께 걷기에 들어온 뒤 다시 열어 주세요.'; $('gblist').appendChild(p); }
+  gbErr = false; gbLoaded = false; gbList = []; ntList = [];
+  if (MP && MP.ok && !MP.offline && MP.gbWatch){
+    gbDraw(); if (gbOff) gbOff(); if (ntOff) ntOff();
+    gbOff = MP.gbWatch(list => { if (list===null) gbErr = true; else { gbList = list; gbErr = false; } gbLoaded = true; gbDraw(); });
+    ntOff = MP.ntWatch(list => { ntList = list||[]; gbDraw(); });
+  } else { $('gblist').textContent = ''; const p = document.createElement('p'); p.className = 'gbempty'; p.textContent = '지금은 연결되어 있지 않아 방명록을 볼 수 없어요. 함께 걷기에 들어온 뒤 다시 열어 주세요.'; $('gblist').appendChild(p); }
 }
-function closeGB(){ $('gbook').hidden = true; gbAdmin = false; $('gbAdm').setAttribute('aria-pressed','false'); $('gbKeyRow').hidden = true; if (gbOff){ gbOff(); gbOff = null; } }
+function closeGB(){ $('gbook').hidden = true; gbSetAdmin(false); if (gbOff){ gbOff(); gbOff = null; } if (ntOff){ ntOff(); ntOff = null; } }
 $('gbClose').onclick = closeGB;
 $('gbAdm').onclick = () => {
-  if (gbAdmin){ gbAdmin = false; $('gbAdm').setAttribute('aria-pressed','false'); $('gbKeyRow').hidden = true; if (gbList.length) gbRender(gbList); return; }
+  if (gbAdmin){ gbSetAdmin(false); return; }
   $('gbKeyRow').hidden = false; $('gbKey').value = gbKey(); $('gbKey').focus();
 };
 $('gbKey').addEventListener('keydown', e => { e.stopPropagation(); if (e.key==='Enter') $('gbKeyOk').click(); });
 $('gbKeyOk').onclick = () => {
   const k = $('gbKey').value.trim(); if (!k) return;
-  store2.set('cp-gbkey',k); gbAdmin = true; $('gbAdm').setAttribute('aria-pressed','true'); $('gbKeyRow').hidden = true;
-  toast('관리자 모드예요. 글마다 삭제 버튼이 보여요'); if (gbList.length) gbRender(gbList);
+  store2.set('cp-gbkey',k); gbSetAdmin(true); toast('관리자 모드예요. 공지를 쓰거나 글을 지울 수 있어요');
 };
+$('gbNt').onchange = gbSyncMode;
 $('gbmsg').addEventListener('keydown', e => e.stopPropagation());
-$('gbmsg').addEventListener('input', () => { $('gbcnt').textContent = $('gbmsg').value.length+'/120'; });
+$('gbmsg').addEventListener('input', () => { $('gbcnt').textContent = $('gbmsg').value.length+'/'+$('gbmsg').maxLength; });
 $('gbsend').onclick = () => {
-  const MP = window.MP, m = $('gbmsg').value.trim().slice(0,120);
+  const MP = window.MP, nt = gbAdmin && $('gbNt').checked, m = $('gbmsg').value.trim().slice(0, nt ? 200 : 120);
   if (!m) return; if (!(MP && MP.ok && !MP.offline && MP.gbAdd)){ toast('연결되어 있지 않아 남기지 못했어요'); return; }
-  const now = performance.now(); if (now-gbLast<20000){ toast('잠시 뒤에 다시 남겨 주세요'); return; }
-  gbLast = now; $('gbsend').disabled = true;
-  MP.gbAdd(String(nick).slice(0,10), m).then(() => { $('gbmsg').value = ''; $('gbcnt').textContent = '0/120'; $('gblist').scrollTop = 0; if (sndOn) chime(); })
-    .catch(() => { gbLast = 0; toast('남기지 못했어요. 잠시 뒤 다시 해 주세요'); }).finally(() => { $('gbsend').disabled = false; });
+  const now = performance.now(); if (!nt && now-gbLast<20000){ toast('잠시 뒤에 다시 남겨 주세요'); return; }
+  if (!nt) gbLast = now; $('gbsend').disabled = true;
+  (nt ? MP.ntAdd(m, gbKey()) : MP.gbAdd(String(nick).slice(0,10), m))
+    .then(() => { $('gbmsg').value = ''; gbSyncMode(); $('gblist').scrollTop = 0; if (nt) toast('공지를 올렸어요'); if (sndOn) chime(); })
+    .catch(() => { if (!nt) gbLast = 0; toast(nt ? '공지를 올리지 못했어요. 관리자 비밀번호를 확인해 주세요' : '남기지 못했어요. 잠시 뒤 다시 해 주세요'); })
+    .finally(() => { $('gbsend').disabled = false; });
 };
 $('tslide').oninput = e => {
   previewH = +e.target.value;
@@ -2115,6 +2141,9 @@ try {
     D.set(D.ref(db,'world/ball'), Object.assign({}, st, {by:id, t:D.serverTimestamp()})).catch(failWorld); };
   MP.gbWatch = cb => D.onValue(D.query(D.ref(db,'guestbook'), D.limitToLast(50)), s => { const v = s.val()||{}; cb(Object.keys(v).map(k => Object.assign({k}, v[k]))); }, () => cb(null));
   MP.gbDel = (k,key) => D.update(D.ref(db), {['gbdel/'+k]:key, ['guestbook/'+k]:null});   // 비밀번호가 맞을 때만 규칙이 지우기를 허락한다
+  MP.ntWatch = cb => D.onValue(D.ref(db,'notices'), s => { const v = s.val()||{}; cb(Object.keys(v).map(k => Object.assign({k}, v[k]))); }, () => cb(null));
+  MP.ntAdd = (m,key) => { const k = D.push(D.ref(db,'notices')).key; return D.update(D.ref(db), {['nkey/'+k]:key, ['notices/'+k]:{m, t:D.serverTimestamp()}}); };
+  MP.ntDel = (k,key) => D.update(D.ref(db), {['nkey/'+k]:key, ['notices/'+k]:null});
   MP.gbAdd = (n,m) => D.push(D.ref(db,'guestbook'), {n, m, t:D.serverTimestamp()});
   MP.act = (aid,obj) => D.update(D.ref(db,'world/acts/'+aid), Object.assign({}, obj, {by:id})).catch(failWorld);
   MP.clearAct = aid => D.remove(D.ref(db,'world/acts/'+aid)).catch(() => {});
