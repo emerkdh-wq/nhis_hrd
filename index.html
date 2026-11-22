@@ -1810,7 +1810,7 @@ function frame(now){
     eye = [cam.x - Math.sin(cam.yaw)*cp*dist, Math.max(.35, ty + .5 - Math.sin(cam.pitch)*dist), cam.z + Math.cos(cam.yaw)*cp*dist];
   } else eye = [cam.x, cam.eye + (reduceMotion?0:Math.sin(walk)*.035*sp), cam.z];
   stepAnimals(dt,time); stepBirds(dt,time); stepBall(dt,vx,vz,sp,!!keys.ShiftLeft);
-  const hr = (+fmtHour.format(new Date(ms)))%24, tennisOn = hr>=19 && hr<22;
+  const hr = (+fmtHour.format(new Date(ms)))%24, tennisOn = hr>=18 && hr<23;
   TLAMPS.forEach((l,i) => lampFlat.set(tennisOn ? l : [0,-9999,0], 36+i*3));
   if (resting){ const ph = ((now-restT0)/1000)%10; const tx = ph<4 ? '숨을 들이쉽니다' : '천천히 내쉽니다'; if ($('breath').textContent!==tx) $('breath').textContent = tx; }
 
