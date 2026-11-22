@@ -761,8 +761,16 @@ function prog(vs,fs){
 }
 const FOG = 'uniform vec3 uCam,uFogCol;uniform float uFog;vec3 fog(vec3 c,vec3 wp){float d=length(wp-uCam)*uFog;return mix(c,uFogCol,1.-exp(-d*d));}';
 const LIT = prog(
- 'attribute vec3 aP,aN,aC;attribute vec2 aU;uniform mat4 uVP,uM;varying vec3 vP,vN,vC;varying vec2 vU;'+
- 'void main(){vec4 w=uM*vec4(aP,1.);vP=w.xyz;vN=(uM*vec4(aN,0.)).xyz;vC=aC;vU=aU;gl_Position=uVP*w;}',
+ 'attribute vec3 aP,aN,aC;attribute vec2 aU;uniform mat4 uVP,uM;uniform vec4 uCat;varying vec3 vP,vN,vC;varying vec2 vU;'+
+ 'vec2 rot(vec2 v,float a){float c=cos(a),s=sin(a);return vec2(v.x*c-v.y*s,v.x*s+v.y*c);}'+
+ 'void main(){vec3 q=aP;'+
+ // 르샤: uCat=(켜짐, 걸음 위상, 걸음 크기, 시간). 앞다리는 z>0.1, 뒷다리는 z<0.1, 다리는 y<-0.12부터 구부린다
+ 'if(uCat.x>.5){float wl=smoothstep(-.12,-.45,q.y);'+
+ 'if(wl>0.){bool fr=q.z>.1;float sd=q.x>-.06?1.:-1.;float ph=uCat.y+(fr?0.:3.1416)+(sd>0.?0.:3.1416);float a=sin(ph)*uCat.z*wl;'+
+ 'vec2 pv=fr?vec2(.5,-.1):vec2(-.3,-.1);vec2 o=rot(vec2(q.z,q.y)-pv,-a)+pv;q.z=o.x;q.y=o.y+max(0.,cos(ph))*.05*uCat.z*wl;}'+
+ 'float wt=smoothstep(-.5,-.65,q.z)*smoothstep(-.1,.65,q.y);q.x+=sin(uCat.w*2.2+q.y*2.5)*.12*wt;'+
+ 'float wh=smoothstep(.5,.65,q.z)*smoothstep(-.05,.1,q.y);q.y+=sin(uCat.y*2.)*.022*uCat.z*wh*2.;}'+
+ 'vec4 w=uM*vec4(q,1.);vP=w.xyz;vN=(uM*vec4(aN,0.)).xyz;vC=aC;vU=aU;gl_Position=uVP*w;}',
  'varying vec3 vP,vN,vC;varying vec2 vU;uniform sampler2D uTex,uEmi;uniform vec3 uSunDir,uSunCol,uAmbS,uAmbG,uLamp[16];'+
  'uniform float uNight,uSnow,uWet;'+FOG+
  'void main(){vec4 t=texture2D(uTex,vU);if(t.a<.02)discard;vec3 n=normalize(vN);if(dot(n,vP-uCam)>0.)n=-n;'+
@@ -1168,7 +1176,7 @@ function syncAnimals(dt,MP){
     if (a.tv>0 && !a.tr){ a.tx += Math.sin(a.th)*a.tv*dt; a.tz -= Math.cos(a.th)*a.tv*dt; }
     const ox = a.x, oz = a.z; a.x += (a.tx-a.x)*k; a.z += (a.tz-a.z)*k;
     let dh = a.th-a.h; dh = Math.atan2(Math.sin(dh),Math.cos(dh)); a.h += dh*k;
-    const mv = Math.hypot(a.x-ox,a.z-oz); a.v = a.tv; a.ph += mv*(a.deer?1.5:a.cat?9:2.8); a.sitT = a.v>0 ? 0 : (a.sitT||0)+dt;
+    const mv = Math.hypot(a.x-ox,a.z-oz); a.v = a.cat ? mv/Math.max(dt,1e-3) : a.tv; a.ph += mv*(a.deer?1.5:a.cat?18:2.8); a.sitT = a.v>0 ? 0 : (a.sitT||0)+dt;
     a.ridden = a.tr || riding===a;
     if (a.tp && !(a.pet>0)) a.pet = 2.6; else if (a.pet>0) a.pet -= dt;
     if (a.react && a.react.t>0) a.react.t -= dt;
@@ -1211,11 +1219,19 @@ function stepAnimals(dt,time){
     if (a.pet>0){ a.pet -= dt; a.wait = Math.max(a.wait,.8); }
     const near = !a.cat && !a.ridden && !(a.pet>0) && Math.hypot(a.x-cam.x,a.z-cam.z)<9 && keys.ShiftLeft && !riding && !follow;
     if (near && !a.flee){ a.flee = true; a.wait = 0; a.way = a.way.slice(-2); }
-    if (a.wait>0 && !a.flee){ a.wait -= dt; a.v = 0; continue; }
+    if (a.wait>0 && !a.flee){ a.wait -= dt; a.v = 0; a.cv = 0; continue; }
     const dx = w2[0]-a.x, dz = w2[1]-a.z, d = Math.hypot(dx,dz), sp = a.cat ? (a.runT>0 ? 6.5 : 1.1) : (a.deer?7.5:4.6)*(a.flee?1.5:1);
     if (d<.8){ a.way.shift(); if (a.cat) a.wait = 3+Math.random()*9; else if (a.way.length>2 && !a.flee) a.wait = 1.5+Math.random()*4; continue; }
-    const th = Math.atan2(dx,-dz); let dh = th-a.h; dh = Math.atan2(Math.sin(dh),Math.cos(dh)); a.h += dh*Math.min(1,dt*6);
-    a.x += Math.sin(a.h)*sp*dt; a.z -= Math.cos(a.h)*sp*dt; a.v = sp; a.ph += dt*(a.cat?8:a.deer?11:13)*(a.flee?1.3:1);
+    const th = Math.atan2(dx,-dz); let dh = th-a.h; dh = Math.atan2(Math.sin(dh),Math.cos(dh));
+    if (a.cat){   // 르샤: 목적지에 가까워지면 느려지고, 크게 꺾을 때는 걸음을 늦춰 천천히 돈다
+      a.h += dh*Math.min(1,dt*(a.runT>0?4:1.8));
+      const want = sp*clamp(d/1.6,.3,1)*(1-.6*Math.min(1,Math.abs(dh)/1.4));
+      a.cv = (a.cv||0) + (want-(a.cv||0))*Math.min(1,dt*2.2);
+      a.x += Math.sin(a.h)*a.cv*dt; a.z -= Math.cos(a.h)*a.cv*dt; a.v = a.cv; a.ph += a.cv*dt*18;
+      continue;
+    }
+    a.h += dh*Math.min(1,dt*6);
+    a.x += Math.sin(a.h)*sp*dt; a.z -= Math.cos(a.h)*sp*dt; a.v = sp; a.ph += dt*(a.deer?11:13)*(a.flee?1.3:1);
   }
   if (net) publishAnimals(MP,time);
 }
@@ -1242,8 +1258,11 @@ function catMatrix(d){
   const sp = CAT_SPEC[d.pose], s = sp.s, f = [Math.sin(d.h),0,-Math.cos(d.h)], r = [Math.cos(d.h),0,Math.sin(d.h)];
   // 모델 축이 세상의 어느 방향으로 가는지: (x축, z축)
   const ax = sp.front==='z' ? [-r[0],0,-r[2]] : [-f[0],0,-f[2]], az = sp.front==='z' ? f : [-r[0],0,-r[2]];
-  const tx = d.x+r[0]*d.shake, tz = d.z+r[2]*d.shake, ty = d.gy - sp.ymin*s + d.bob;
-  return new Float32Array([ax[0]*s,0,ax[2]*s,0, 0,s,0,0, az[0]*s,0,az[2]*s,0, tx,ty,tz,1]);
+  const tx = d.x+r[0]*d.shake, tz = d.z+r[2]*d.shake, ty = d.gy - sp.ymin*s*d.squash + d.bob, sy = s*d.squash;
+  // 걸을 때 몸을 좌우로 살짝 기울인다 (앞 방향 축을 중심으로)
+  const cr = Math.cos(d.roll), sr = Math.sin(d.roll), up = [r[0]*sr,cr,r[2]*sr], fx = ax.map(v => v), rx = [ax[0]*cr, -sr*(sp.front==='z'?-1:0), ax[2]*cr];
+  const X = sp.front==='z' ? rx : fx;
+  return new Float32Array([X[0]*s,X[1]*s,X[2]*s,0, up[0]*sy,up[1]*sy,up[2]*sy,0, az[0]*s,0,az[2]*s,0, tx,ty,tz,1]);
 }
 for (const k in CAT_SPEC){ const sp = CAT_SPEC[k];
   loadModel(sp.file, sp.id, (x,y,z) => [x,y,z], (x,y,z) => [x,y,z], () => 0).then(m => { CATM[k] = m; }).catch(e => console.warn('치즈냥이 모델('+k+')을 불러오지 못해 단순 모형을 씁니다:', e)); }
@@ -1264,7 +1283,13 @@ function drawAnimal(m,a){
     }
   } else if (a.cat && CATM.walk && CATM.sit && CATM.belly){   // 치즈냥이 3D 모델 (힉스필드)
     const rk = a.react && a.react.t>0 ? a.react.k : (a.tk||0), sit = !moving && (a.sitT>1.2 || rk===2 || rk===3);
-    catDraws.push({x:a.x, z:a.z, h:a.h, gy, pose: rk===1 ? 'belly' : sit ? 'sit' : 'walk', bob: moving ? Math.abs(Math.sin(a.ph))*.025 : 0, shake: rk===2 ? Math.sin(performance.now()/40)*.025 : 0});
+    const pose = rk===1 ? 'belly' : sit ? 'sit' : 'walk', now = performance.now()/1000;
+    if (a.dpose!==pose){ a.dpose = pose; a.poseT = now; }
+    const tt = clamp((now-(a.poseT||0))/.4,0,1), squash = 1-.16*Math.sin(Math.PI*tt);   // 자세가 바뀔 때 몸을 낮췄다 편다
+    const gait = clamp((a.v||0)/1.1,0,1.4);
+    catDraws.push({x:a.x, z:a.z, h:a.h, gy, pose, squash, ph:a.ph, amp:pose==='walk' ? .42*Math.min(1,gait) : 0,
+      bob: pose==='walk' ? Math.abs(Math.sin(a.ph))*.012*gait : 0, roll: pose==='walk' ? Math.sin(a.ph)*.035*gait : 0,
+      shake: rk===2 ? Math.sin(now*25)*.025 : 0});
     const at=(fx,up,rx)=>[a.x+f[0]*fx+r[0]*rx, gy+up, a.z+f[1]*fx+r[1]*rx];
     if (rk===2) for (const k of [-1,0,1]) m.seg(at(.3,.36+k*.05,-.04+k*.06),at(.38,.24+k*.05,.04+k*.06),.008,[.9,.15,.15]);   // 빨간 할퀸 자국
     if (a.pet>0) for(let k=0;k<3;k++){ const u = ((2.6-a.pet)*.55+k/3)%1, hx2 = a.x+Math.sin(k*2.1+u*4)*.18, hz2 = a.z+Math.cos(k*2.1)*.12, hy2 = gy+.6+u*.9, hs = .07*(1-u*.4);
@@ -1790,7 +1815,8 @@ function frame(now){
   if (torch.length) lampFlat.set(torch[1],36);   // 테니스 조명이 꺼진 시간이라 그 자리를 손전등 빛으로 쓴다
   gl.bindBuffer(gl.ARRAY_BUFFER,gondB); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(gm.a),gl.DYNAMIC_DRAW);
   drawLit({b:gondB,n:gm.a.length/11});
-  for (const d of catDraws){ const M = CATM[d.pose]; drawLit(M.buf,M.t,T.black,catMatrix(d)); }
+  for (const d of catDraws){ const M = CATM[d.pose]; gl.uniform4f(LIT.u.uCat, d.pose==='walk'?1:0, d.ph, d.amp, time%1000); drawLit(M.buf,M.t,T.black,catMatrix(d)); }
+  gl.uniform4f(LIT.u.uCat,0,0,0,0);
   catDraws.length = 0;
 
   // 호수
@@ -1878,7 +1904,7 @@ function frame(now){
   }
   requestAnimationFrame(frame);
 }
-window.sansa = {catReact:k => { const c = animals.find(a => a.cat); petRabbit.__k = k; const R = Math.random; Math.random = () => (k-1)/4+.01; petRabbit(c); Math.random = R; },catPos:() => { const c = animals.find(a => a.cat); return c ? [c.x,c.z] : null; },bench:i => { const b = BENCHES[i], l = seatAt(b,-1), r = seatAt(b,1); return {x:b.x,z:b.z,h:b.h,lx:l[0],lz:l[1],rx:r[0],rz:r[1]}; },ballPos:() => [Math.round(ball.x*10)/10,Math.round(ball.z*10)/10],me:() => [cam.x,cam.z],deer:() => spawnAnimal('deer'), rabbit:() => spawnAnimal('rabbit'), head:() => cam.head*180/Math.PI,walker:(off) => { const sec = seoulSec(Date.now()+previewH*36e5); return sec>=23*3600 ? loopAt((sec-23*3600)*1.1+LOOP.len/2+(off||0)) : loopAt((sec-(sec>=18*3600?18:12)*3600)*.9+(off||0)); },birds:() => birds.map(b => [b.x,b.y,b.z]),lie:() => setLie(true), bird:() => { nextBird = 0; }, ball:(x,z,vx,vz) => { ball.x = x; ball.z = z; ball.vx = vx||0; ball.vz = vz||0; },animal:() => { nextAnimal = 0; }, animals:() => animals.map(a => [a.deer,Math.round(a.x),Math.round(a.z),a.wait>0]), view:t => { third = t; },preview:h => { previewH = h; }, weather:k => { wxKey = k; cur.cover = WX[k].cover; cur.fog = WX[k].fog; cur.rain = WX[k].rain; cur.snow = WX[k].snow; cur.snowGround = WX[k].snow; },
+window.sansa = {catGo:() => { const c = animals.find(a => a.cat); c.wait = 0; c.way = [[c.x+Math.sin(c.h)*30,c.z-Math.cos(c.h)*30]]; },catH:() => { const c = animals.find(a => a.cat); return c ? [c.x,c.z,c.h,c.v||0] : null; },catReact:k => { const c = animals.find(a => a.cat); petRabbit.__k = k; const R = Math.random; Math.random = () => (k-1)/4+.01; petRabbit(c); Math.random = R; },catPos:() => { const c = animals.find(a => a.cat); return c ? [c.x,c.z] : null; },bench:i => { const b = BENCHES[i], l = seatAt(b,-1), r = seatAt(b,1); return {x:b.x,z:b.z,h:b.h,lx:l[0],lz:l[1],rx:r[0],rz:r[1]}; },ballPos:() => [Math.round(ball.x*10)/10,Math.round(ball.z*10)/10],me:() => [cam.x,cam.z],deer:() => spawnAnimal('deer'), rabbit:() => spawnAnimal('rabbit'), head:() => cam.head*180/Math.PI,walker:(off) => { const sec = seoulSec(Date.now()+previewH*36e5); return sec>=23*3600 ? loopAt((sec-23*3600)*1.1+LOOP.len/2+(off||0)) : loopAt((sec-(sec>=18*3600?18:12)*3600)*.9+(off||0)); },birds:() => birds.map(b => [b.x,b.y,b.z]),lie:() => setLie(true), bird:() => { nextBird = 0; }, ball:(x,z,vx,vz) => { ball.x = x; ball.z = z; ball.vx = vx||0; ball.vz = vz||0; },animal:() => { nextAnimal = 0; }, animals:() => animals.map(a => [a.deer,Math.round(a.x),Math.round(a.z),a.wait>0]), view:t => { third = t; },preview:h => { previewH = h; }, weather:k => { wxKey = k; cur.cover = WX[k].cover; cur.fog = WX[k].fog; cur.rain = WX[k].rain; cur.snow = WX[k].snow; cur.snowGround = WX[k].snow; },
   look:(x,z,yawDeg,pitch) => { cam.x = x; cam.z = z; cam.yaw = yawDeg*rad; cam.pitch = pitch||0; }, sun:() => sunPos(Date.now()+previewH*36e5).alt/rad};
 requestAnimationFrame(frame);
 })();
