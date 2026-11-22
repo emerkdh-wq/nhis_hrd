@@ -1459,7 +1459,7 @@ function drawBirds(m,time){
 }
 /* ───────── 축구공 ───────── */
 const ball = {x:9, z:17, y:0, vx:0, vz:0, vy:0, goalT:0};
-let ballK = null, ballHour = null;
+let ballK = null, ballHour = null, ballPending = false, ballLastCam = null, ballSentAt = null;
 function centerBall(){ ball.x = 0; ball.z = 0; ball.y = 0; ball.vx = ball.vz = ball.vy = 0; ball.goalT = 0; ball.inNet = false; }
 function stepBall(dt,dx,dz,sp,run){
   const net = netOn(), MP = window.MP;
@@ -1481,9 +1481,19 @@ function stepBall(dt,dx,dz,sp,run){
     if (sp>.1 && l>0){ const k = (run?15:9)*sp; ball.vx = (dx/l*.7+nx*.3)*k; ball.vz = (dz/l*.7+nz*.3)*k; ball.vy = run ? 4.5 : 2.2; kicked = true; if (ac && sndOn) tone(150,.1,.12); }
     ball.x = cam.x+nx*.5; ball.z = cam.z+nz*.5; pushed = true;
   }
-  if (net && (kicked || pushed)){ ballK = Date.now()+'-'+MP.id;
-    MP.setBall({x:r1(ball.x), z:r1(ball.z), y:Math.round(ball.y*100)/100, vx:Math.round(ball.vx*100)/100, vz:Math.round(ball.vz*100)/100, vy:Math.round(ball.vy*100)/100, g:r1(ball.goalT), k:ballK}, kicked); }
+  // 몰고 가는 동안에는 공도 내 걸음 속도로 굴러가게 해서, 다른 사람 화면에서도 매끄럽게 이어 보이게 한다
+  if (pushed && !kicked && dt>0 && ballLastCam){ ball.vx = clamp((cam.x-ballLastCam[0])/dt,-8,8); ball.vz = clamp((cam.z-ballLastCam[1])/dt,-8,8); }
+  ballLastCam = [cam.x,cam.z];
+  if (pushed && !kicked && !ballPending && ballSentAt && Math.hypot(ball.x-ballSentAt[0],ball.z-ballSentAt[1])<.05) pushed = false;   // 그대로 붙어 서 있기만 하면 다시 보내지 않는다
+  if (net && (kicked || pushed || ballPending)){
+    const k2 = Date.now()+'-'+MP.id;
+    const sent = MP.setBall({x:Math.round(ball.x*100)/100, z:Math.round(ball.z*100)/100, y:Math.round(ball.y*100)/100, vx:Math.round(ball.vx*100)/100, vz:Math.round(ball.vz*100)/100, vy:Math.round(ball.vy*100)/100, g:r1(ball.goalT), k:k2}, kicked);
+    if (sent){ ballK = k2; ballPending = false; ballSentAt = [ball.x,ball.z]; } else ballPending = true;   // 너무 잦아서 못 보낸 마지막 위치는 조금 뒤에 꼭 보낸다
+  }
   ballPhys(dt,false);
+  // 화면에 그리는 공은 실제 위치를 부드럽게 따라가게 해서, 다른 사람이 찬 공이 순간이동하지 않게 한다
+  if (ball.rx===undefined || Math.hypot(ball.x-ball.rx,ball.z-ball.rz)>6){ ball.rx = ball.x; ball.rz = ball.z; ball.ry = ball.y; }
+  else { const f = 1-Math.exp(-dt*14); ball.rx += (ball.x-ball.rx)*f; ball.rz += (ball.z-ball.rz)*f; ball.ry += (ball.y-ball.ry)*f; }
 }
 function ballPhys(dt,quiet){
   if (ball.goalT>0) ball.goalT -= dt;   // 골이 들어가도 공은 골대 안에 그대로 남아 다시 찰 수 있다
@@ -2025,7 +2035,7 @@ function frame(now){
       if (ta) for (const k in ta){ if (k[0]!=='f') continue; const i = +k.slice(1), t = now-(sn-ta[k])/1000; if (i>=0 && i<TOMATO.eaten.length && t>TOMATO.eaten[i]) TOMATO.eaten[i] = t; } }
     TOMATO.fruits.forEach((f,i) => { if (now-TOMATO.eaten[i]>90) gm.blob(f[0],f[1],f[2],.05,.05,.05,f[3]?[.45,.62,.2]:[.9,.12,.08],i); });
     const hu = now-heartT; if (third) drawHearts(gm,cam.x,gy,cam.z,hu); }
-  drawBirds(gm,time); gm.blob(ball.x,ball.y+.15,ball.z,.14,.14,.14,[.96,.96,.94],3);
+  drawBirds(gm,time); gm.blob(ball.rx??ball.x,(ball.ry??ball.y)+.15,ball.rz??ball.z,.14,.14,.14,[.96,.96,.94],3);
   if (tennisOn && cur.rain<.5) drawTennis(gm,time);
   const torch = []; drawWalkers(gm,ms,torch);
   if (torch.length) lampFlat.set(torch[1],36);   // 테니스 조명이 꺼진 시간이라 그 자리를 손전등 빛으로 쓴다
@@ -2162,8 +2172,8 @@ try {
   MP.pubAnimals = ch => { if (!MP.offline) D.update(D.ref(db,'world/animals'), ch).catch(failWorld); };
   MP.resetAnimals = () => { if (!MP.offline) D.set(D.ref(db,'world/animals'), null).catch(failWorld); };
   let lastB = 0;
-  MP.setBall = (st,force) => { const n = performance.now(); if (MP.offline || (!force && n-lastB<400)) return; lastB = n;
-    D.set(D.ref(db,'world/ball'), Object.assign({}, st, {by:id, t:D.serverTimestamp()})).catch(failWorld); };
+  MP.setBall = (st,force) => { const n = performance.now(); if (MP.offline || (!force && n-lastB<250)) return false; lastB = n;
+    D.set(D.ref(db,'world/ball'), Object.assign({}, st, {by:id, t:D.serverTimestamp()})).catch(failWorld); return true; };
   MP.gbWatch = cb => D.onValue(D.query(D.ref(db,'guestbook'), D.limitToLast(50)), s => { const v = s.val()||{}; cb(Object.keys(v).map(k => Object.assign({k}, v[k]))); }, () => cb(null));
   MP.gbDel = (k,key) => D.update(D.ref(db), {['gbdel/'+k]:key, ['guestbook/'+k]:null});   // 비밀번호가 맞을 때만 규칙이 지우기를 허락한다
   MP.ntWatch = cb => D.onValue(D.ref(db,'notices'), s => { const v = s.val()||{}; cb(Object.keys(v).map(k => Object.assign({k}, v[k]))); }, () => cb(null));
