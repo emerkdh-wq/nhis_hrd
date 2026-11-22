@@ -1253,7 +1253,7 @@ function publishAnimals(MP,time){
 }
 // 치즈냥이 모델: [모델의 앞 방향 축, 바닥 높이(모델 좌표), 크기]. walk·sit는 앞이 +z, belly는 머리가 -x
 const CATM = {}, catDraws = [];
-const CAT_SPEC = {walk:{file:'cat_walk.glb', id:'cwdata', front:'z', ymin:-.65, s:.3}, sit:{file:'cat_sit.glb', id:'csdata', front:'z', ymin:-.95, s:.2}, belly:{file:'cat_belly.glb', id:'cbdata', front:'-x', ymin:-.37, s:.29}};
+const CAT_SPEC = {walk:{file:'cat_walk.glb', id:'cwdata', front:'z', ymin:-.65, s:.39}, sit:{file:'cat_sit.glb', id:'csdata', front:'z', ymin:-.95, s:.26}, belly:{file:'cat_belly.glb', id:'cbdata', front:'-x', ymin:-.37, s:.377}};   // 1.3배
 function catMatrix(d){
   const sp = CAT_SPEC[d.pose], s = sp.s, f = [Math.sin(d.h),0,-Math.cos(d.h)], r = [Math.cos(d.h),0,Math.sin(d.h)];
   // 모델 축이 세상의 어느 방향으로 가는지: (x축, z축)
@@ -1291,8 +1291,8 @@ function drawAnimal(m,a){
       bob: pose==='walk' ? Math.abs(Math.sin(a.ph))*.012*gait : 0, roll: pose==='walk' ? Math.sin(a.ph)*.035*gait : 0,
       shake: rk===2 ? Math.sin(now*25)*.025 : 0});
     const at=(fx,up,rx)=>[a.x+f[0]*fx+r[0]*rx, gy+up, a.z+f[1]*fx+r[1]*rx];
-    if (rk===2) for (const k of [-1,0,1]) m.seg(at(.3,.36+k*.05,-.04+k*.06),at(.38,.24+k*.05,.04+k*.06),.008,[.9,.15,.15]);   // 빨간 할퀸 자국
-    if (a.pet>0) for(let k=0;k<3;k++){ const u = ((2.6-a.pet)*.55+k/3)%1, hx2 = a.x+Math.sin(k*2.1+u*4)*.18, hz2 = a.z+Math.cos(k*2.1)*.12, hy2 = gy+.6+u*.9, hs = .07*(1-u*.4);
+    if (rk===2) for (const k of [-1,0,1]) m.seg(at(.39,.47+k*.06,-.05+k*.08),at(.49,.31+k*.06,.05+k*.08),.01,[.9,.15,.15]);   // 빨간 할퀸 자국
+    if (a.pet>0) for(let k=0;k<3;k++){ const u = ((2.6-a.pet)*.55+k/3)%1, hx2 = a.x+Math.sin(k*2.1+u*4)*.18, hz2 = a.z+Math.cos(k*2.1)*.12, hy2 = gy+.75+u*.9, hs = .07*(1-u*.4);
       for(const sd of [-1,1]) m.blob(hx2+r[0]*sd*hs*.6,hy2,hz2+r[1]*sd*hs*.6,hs*.7,hs*.7,hs*.7,[1,.38,.55],k);
       m.blob(hx2,hy2-hs*.6,hz2,hs*.55,hs*.6,hs*.55,[1,.38,.55],k+3); }
   } else if (a.cat){   // 치즈냥이: 주황 줄무늬, 하얀 가슴, 꼬리를 세우고 걷는다
