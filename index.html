@@ -2043,9 +2043,13 @@ try {
   const myQ = D.ref(db,'queue/'+id);
   D.onValue(D.ref(db,'queue'), s => { queue = s.val()||{}; if (waiting) checkTurn(); }, () => { queueOk = false; });
   const regulars = () => { const now = Date.now()+offset; return [...peers.values()].filter(p => now-(p.t||0)<=45000 && !isVip(p.n)).length; };
+  let counted = false;
   function admit(){
     waiting = false; clearInterval(qBeat); D.remove(myQ).catch(() => {});
     D.onDisconnect(me).remove(); MP.joined = true; MP.ok = true; MP.waiting = false;
+    if (!counted){ counted = true;   // 방문 기록: 들어올 때마다 1씩 센다 (화면에는 보이지 않고 Firebase 콘솔의 stats에서 본다)
+      const kst = new Date(Date.now()+offset+9*3600e3).toISOString(), day = kst.slice(0,10), inc = D.increment(1);
+      D.update(D.ref(db,'stats'), {total:inc, ['monthly/'+kst.slice(0,7)]:inc, ['daily/'+day]:inc, ['hourly/'+day+'/'+kst.slice(11,13)]:inc}).catch(() => {}); }
     const q = document.getElementById('queue'); if (q) q.hidden = true;
     const t = document.getElementById('toast'); if (t){ t.textContent = '함께 걷기에 들어왔어요'; t.classList.add('on'); setTimeout(() => t.classList.remove('on'), 4000); }
   }
