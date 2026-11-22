@@ -1264,7 +1264,8 @@ function catMatrix(d){
   const X = sp.front==='z' ? rx : fx;
   return new Float32Array([X[0]*s,X[1]*s,X[2]*s,0, up[0]*sy,up[1]*sy,up[2]*sy,0, az[0]*s,0,az[2]*s,0, tx,ty,tz,1]);
 }
-for (const k in CAT_SPEC){ const sp = CAT_SPEC[k];
+const USE_CAT_MODELS = false;   // 힉스필드 고양이 모델 대신 직접 그린 르샤를 쓴다 (true로 바꾸면 모델 사용)
+if (USE_CAT_MODELS) for (const k in CAT_SPEC){ const sp = CAT_SPEC[k];
   loadModel(sp.file, sp.id, (x,y,z) => [x,y,z], (x,y,z) => [x,y,z], () => 0).then(m => { CATM[k] = m; }).catch(e => console.warn('치즈냥이 모델('+k+')을 불러오지 못해 단순 모형을 씁니다:', e)); }
 function drawAnimal(m,a){
   const f=[Math.sin(a.h),-Math.cos(a.h)], r=[Math.cos(a.h),Math.sin(a.h)], moving = a.v>0;
