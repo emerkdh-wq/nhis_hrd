@@ -1169,7 +1169,13 @@ $('toast').addEventListener('click', () => {
   petting = null; follow = a; firstTouch(); $('toast').classList.remove('on'); toastTarget = null;
 });
 function spawnAnimal(kind){
-  const deer = kind==='deer' || (kind!=='rabbit' && Math.random()<.5), n = !deer && Math.random()<.4 ? 2 : 1, z0 = -22+Math.random()*44;
+  // 운동장에는 고라니 최대 2마리, 토끼 최대 1마리까지만 들어온다
+  const nd = animals.filter(a => a.deer && !a.cat).length, nr = animals.filter(a => !a.deer && !a.cat).length;
+  const okD = nd<2, okR = nr<1; if (!okD && !okR) return;
+  let deer = kind==='deer' || (kind!=='rabbit' && Math.random()<.5);
+  if (deer && !okD) deer = false; else if (!deer && !okR) deer = true;
+  if ((deer && !okD) || (!deer && !okR)) return;
+  const n = 1, z0 = -22+Math.random()*44;
   const first = animals.length;
   for(let i=0;i<n;i++){
     const way = []; const k = 2+Math.floor(Math.random()*2);
