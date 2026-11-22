@@ -1463,14 +1463,14 @@ let ballK = null, ballHour = null;
 function centerBall(){ ball.x = 0; ball.z = 0; ball.y = 0; ball.vx = ball.vz = ball.vy = 0; ball.goalT = 0; ball.inNet = false; }
 function stepBall(dt,dx,dz,sp,run){
   const net = netOn(), MP = window.MP;
-  // 정각마다 공을 센터서클 가운데로 되돌린다 (모든 화면이 같은 시각에 함께 되돌린다)
-  const hk = Math.floor((net ? MP.now() : Date.now())/36e5);
+  // 매일 아침 6시(한국 시각)에 공을 센터서클 가운데로 되돌린다 (모든 화면이 같은 시각에 함께 되돌린다)
+  const hk = Math.floor(((net ? MP.now() : Date.now())+3*36e5)/864e5), resetAt = hk*864e5-3*36e5;
   if (ballHour===null) ballHour = hk;
-  else if (hk!==ballHour){ ballHour = hk; centerBall(); ballK = 'h'+hk;
+  else if (hk!==ballHour){ ballHour = hk; centerBall(); ballK = 'd'+hk;
     if (net) MP.setBall({x:0, z:0, y:0, vx:0, vz:0, vy:0, g:0, k:ballK}, true); }
   if (net && MP.ball && MP.ball.k!==ballK){   // 다른 사람이 찬 공: 찬 순간부터 지난 시간만큼 굴려 맞춘다
     const b = MP.ball; ballK = b.k;
-    if (b.t && b.t<hk*36e5) centerBall();   // 지난 시간대에 찬 공은 이미 가운데로 돌아와 있다
+    if (b.t && b.t<resetAt) centerBall();   // 지난 시간대에 찬 공은 이미 가운데로 돌아와 있다
     else if (b.by!==MP.id){ ball.x = b.x; ball.z = b.z; ball.y = b.y||0; ball.vx = b.vx||0; ball.vz = b.vz||0; ball.vy = b.vy||0; ball.goalT = b.g||0; ball.inNet = Math.abs(ball.z)>50.2 && Math.abs(ball.x)<3.5;
       let el = clamp((MP.now()-(b.t||MP.now()))/1000,0,8); while (el>1e-4){ const s1 = Math.min(el,1/60); ballPhys(s1,true); el -= s1; } }
   }
@@ -1550,7 +1550,13 @@ $('nick').addEventListener('keydown', e => e.stopPropagation());
 let myWave = -99, myWaveId = 0;
 $('bWave').onclick = () => { myWave = performance.now()/1000; myWaveId = Date.now(); firstTouch(); };
 const tagEls = new Map(); let lastMpCount = -1;
-function myPose(){ return riding ? 4 : petting ? 5 : lying ? 2 : seated>=0 ? 1 : resting ? 3 : 0; }
+function myPose(){ return riding ? 4 : petting ? 5 : eating ? 6 : lying ? 2 : seated>=0 ? 1 : resting ? 3 : 0; }
+// 방울토마토를 먹은 사람 머리 위로 올라가는 하트 세 개 (hu: 하트가 시작된 뒤 지난 초)
+function drawHearts(m,x,gy,z,hu){
+  if (!(hu>0 && hu<3)) return; const rr2 = [Math.cos(cam.yaw),Math.sin(cam.yaw)];
+  for (let k=0;k<3;k++){ const u = (hu*.45+k/3)%1, hy = gy+2.05+u*1.1, hs = .2*(1-u*.35), hx = x+Math.sin(k*2.1+u*4)*.3, hz = z+Math.cos(k*2.1)*.15;
+    for (const sd of [-1,1]) m.blob(hx+rr2[0]*sd*hs*.6,hy,hz+rr2[1]*sd*hs*.6,hs*.7,hs*.7,hs*.7,[1,.38,.55],k); m.blob(hx,hy-hs*.6,hz,hs*.55,hs*.6,hs*.55,[1,.38,.55],k+3); }
+}
 function drawPeers(m,dt,time,VP){
   const MP = window.MP; if (!MP || !MP.ok || MP.offline) return;
   const k = 1-Math.exp(-dt*6), seen = new Set();
@@ -1564,14 +1570,16 @@ function drawPeers(m,dt,time,VP){
     const mv = Math.hypot(p.rx-ox,p.rz-oz); p.ph += mv*1.6; const moving = mv/Math.max(dt,1e-3) > .4;
     if (p.w && p.w!==p._lastW){ p._lastW = p.w; if (p._seenW){ p.waveUntil = time+2.6; if (Math.hypot(p.x-cam.x,p.z-cam.z)<40) toast((p.n||'손님')+'님이 손을 흔들어요'); } }
     p._seenW = true;
-    const gyp = groundY(p.rx,p.rz), pose = p.p|0, shirt = hex3((SHIRTS[p.s|0]||SHIRTS[0])[1]), waving = p.waveUntil>time;
+    const gyp = groundY(p.rx,p.rz), pose = p.p|0;
+    if (pose===6 && p._pose!==6) p.heartAt = time+.3; p._pose = pose; drawHearts(m,p.rx,gyp,p.rz,time-(p.heartAt||-99));
+    const shirt = hex3((SHIRTS[p.s|0]||SHIRTS[0])[1]), waving = p.waveUntil>time;
     if (pose===4 && !netOn()) drawAnimal(m,{deer:true,x:p.rx,z:p.rz,h:p.rh,v:moving?7:0,ph:p.ph*3,ridden:true});
     person(m,p.rx,gyp+(pose===4?.58:0),p.rz,p.rh,p.ph,moving&&pose===0?1:0,shirt,
-      {chair:pose===1,lie:pose===2,sit:pose===3,ride:pose===4,crouch:pose===5?time+.01:0,hat:p.c|0,
+      {chair:pose===1,lie:pose===2,sit:pose===3,ride:pose===4,crouch:pose===5?time+.01:0,eat:pose===6?time+.01:0,hat:p.c|0,
        umb:p.u===1?[.98,.82,.12]:p.u===2?[.86,.14,.13]:null,wave:waving&&pose===0?time:0});
     // 이름표
     let el = tagEls.get(id); if (!el){ el = document.createElement('span'); $('tags').appendChild(el); tagEls.set(id,el); }
-    const hy = gyp+(pose===2?.7:pose===4?2.9:pose===1||pose===3||pose===5?1.6:2.2);
+    const hy = gyp+(pose===2?.7:pose===4?2.9:pose===1||pose===3||pose===5?1.6:pose===6?3.2:2.2);
     const cx = VP[0]*p.rx+VP[4]*hy+VP[8]*p.rz+VP[12], cy = VP[1]*p.rx+VP[5]*hy+VP[9]*p.rz+VP[13], cw = VP[3]*p.rx+VP[7]*hy+VP[11]*p.rz+VP[15];
     const far = Math.hypot(p.rx-cam.x,p.rz-cam.z);
     if (cw>.5 && far<70){ el.style.display = ''; el.style.left = ((cx/cw*.5+.5)*innerWidth)+'px'; el.style.top = ((1-(cy/cw*.5+.5))*innerHeight)+'px';
@@ -1751,7 +1759,8 @@ function eatTomato(){
   const now = performance.now()/1000, ready = TOMATO.fruits.map((f,i) => i).filter(i => now-TOMATO.eaten[i]>90 && !TOMATO.fruits[i][3]);
   const pick = (ready.length ? ready : TOMATO.fruits.map((f,i) => i).filter(i => now-TOMATO.eaten[i]>90))[0];
   if (pick===undefined) return;
-  TOMATO.eaten[pick] = now;   // 먹은 열매는 1분 30초 뒤 다시 열린다
+  TOMATO.eaten[pick] = now;   // 먹은 열매는 1분 30초 뒤 다시 열린다 (모두의 화면에서 함께 사라진다)
+  if (netOn()) window.MP.act('tomato',{['f'+pick]:window.MP.now()});
   cam.head = Math.atan2(TOMATO.x-cam.x,-(TOMATO.z-cam.z)); eating = {t:1.6}; heartT = now+.3; firstTouch();
   toast('방울토마토가 새콤달콤해요');
   if (sndOn){ tone(320,.05,.08); tone(260,.05,.08,.18); tone(1568,.03,.6,.6); }
@@ -2012,9 +2021,10 @@ function frame(now){
   drawPeers(gm,dt,time,VP);
   for(const a of animals) drawAnimal(gm,a);
   { const now = performance.now()/1000;
+    if (netOn()){ const ta = (window.MP.acts||{}).tomato, sn = window.MP.now();   // 다른 사람이 먹은 열매
+      if (ta) for (const k in ta){ if (k[0]!=='f') continue; const i = +k.slice(1), t = now-(sn-ta[k])/1000; if (i>=0 && i<TOMATO.eaten.length && t>TOMATO.eaten[i]) TOMATO.eaten[i] = t; } }
     TOMATO.fruits.forEach((f,i) => { if (now-TOMATO.eaten[i]>90) gm.blob(f[0],f[1],f[2],.05,.05,.05,f[3]?[.45,.62,.2]:[.9,.12,.08],i); });
-    const hu = now-heartT; if (hu>0 && hu<3 && third) for (let k=0;k<3;k++){ const u = (hu*.45+k/3)%1, hy = gy+2.05+u*1.1, hs = .2*(1-u*.35), hx = cam.x+Math.sin(k*2.1+u*4)*.3, hz = cam.z+Math.cos(k*2.1)*.15, rr2 = [Math.cos(cam.yaw),Math.sin(cam.yaw)];
-      for (const sd of [-1,1]) gm.blob(hx+rr2[0]*sd*hs*.6,hy,hz+rr2[1]*sd*hs*.6,hs*.7,hs*.7,hs*.7,[1,.38,.55],k); gm.blob(hx,hy-hs*.6,hz,hs*.55,hs*.6,hs*.55,[1,.38,.55],k+3); } }
+    const hu = now-heartT; if (third) drawHearts(gm,cam.x,gy,cam.z,hu); }
   drawBirds(gm,time); gm.blob(ball.x,ball.y+.15,ball.z,.14,.14,.14,[.96,.96,.94],3);
   if (tennisOn && cur.rain<.5) drawTennis(gm,time);
   const torch = []; drawWalkers(gm,ms,torch);
