@@ -708,12 +708,12 @@ for(const z of [-50,-38,-26,-16,40,52]){
     for (let j=0;j<4;j++) TOMATO.fruits.push([tx+Math.cos(a)*rad+Math.cos(a+1.6)*(j-1.5)*.06, ty+h-j*.07, tz+Math.sin(a)*rad+Math.sin(a+1.6)*(j-1.5)*.06, j===3 && c%3===0]); }
   TOMATO.eaten = TOMATO.fruits.map(() => -1e9);
 }
-// 돌탑: 방울토마토 나무 옆. 작은 돌을 둥글게 쌓아 위로 갈수록 좁아진다 (높이 약 1.3m, 어른 가슴께)
-const CAIRN = {x:49.3, z:-51.6};
+// 돌탑: 방울토마토 나무에서 호수 쪽. 작은 돌을 둥글게 쌓아 위로 갈수록 좁아진다 (높이 약 1.75m, 사람 키)
+const CAIRN = {x:57.3, z:-51.6};
 { const by = H(CAIRN.x,CAIRN.z)-.04, greys = [[.55,.54,.5],[.48,.47,.44],[.62,.6,.56],[.42,.41,.39],[.58,.55,.5],[.5,.5,.48]];
-  let y = by, sd = 0; const L = 13;
+  let y = by, sd = 0; const L = 17;
   for (let l=0;l<L;l++){
-    const t = l/(L-1), R = .52*(1-t)+.07, n = Math.max(1, Math.round(R*15)), sh = .1+.02*Math.sin(l*1.7), off = l*.9;
+    const t = l/(L-1), R = .62*(1-t)+.07, n = Math.max(1, Math.round(R*15)), sh = .1+.02*Math.sin(l*1.7), off = l*.9;
     for (let k=0;k<n;k++){ const a = off+k/n*6.283, r = n===1 ? 0 : R*(.62+.1*Math.sin(k*2.3+l)), sz = n===1 ? .1 : Math.min(.17, R*.95/Math.max(1,n/6));
       P.blob(CAIRN.x+Math.cos(a)*r, y+sh*.5, CAIRN.z+Math.sin(a)*r, sz*(1+.25*Math.sin(k+l)), sh*.55, sz*(.85+.2*Math.cos(k*1.3)), greys[(k+l)%greys.length], sd++); }
     if (n>3) P.blob(CAIRN.x, y+sh*.5, CAIRN.z, R*.6, sh*.55, R*.6, greys[l%greys.length], sd++);   // 가운데 속돌
@@ -723,9 +723,9 @@ const CAIRN = {x:49.3, z:-51.6};
   SOLIDS.push([CAIRN.x,CAIRN.z,.7]);
 }
 // 세잎클로버밭: 방울토마토 나무에서 호수 쪽으로 더 들어간 풀밭. 잎 세 장짜리 클로버가 빽빽하고 흰 꽃이 드문드문 핀다
-const CLOVER = {x:52.2, z:-45.5, r:2.4};
+const CLOVER = {x:55.5, z:-43.5, r:4.2};
 { const G1 = [.24,.5,.2], G2 = [.3,.58,.24], G3 = [.2,.44,.17];
-  for (let i=0;i<110;i++){
+  for (let i=0;i<330;i++){
     const a = Math.random()*6.283, d = Math.sqrt(Math.random())*CLOVER.r, cx = CLOVER.x+Math.cos(a)*d*1.15, cz = CLOVER.z+Math.sin(a)*d, cy = H(cx,cz)+.03+Math.random()*.05, rot = Math.random()*6.283, col = [G1,G2,G3][i%3];
     for (let k=0;k<3;k++){ const b = rot+k*2.094, lx = cx+Math.cos(b)*.07, lz = cz+Math.sin(b)*.07;
       P.blob(lx,cy,lz,.075,.018,.075,col,i*3+k); }
@@ -1303,6 +1303,7 @@ function personRaw(m,x,y,z,h,ph,sw,shirt,o){
     m.blob(b[0],b[1],b[2],.34,.025,.34,[.86,.74,.45],4); m.blob(c[0],c[1],c[2],.16,.1,.16,[.88,.77,.48],5);
     m.blob(c[0],c[1]-.05,c[2],.165,.025,.165,[.5,.2,.17],6); }
 }
+const maxX = z => z<-22 ? 64 : 54.8;   // 북동쪽 호숫가 풀밭(돌탑·클로버밭)은 더 동쪽까지 걸어갈 수 있다
 const groundY = (x,z) => x>40.6 ? H(x,z)+.02 : .04;
 function blocked(x,z){
   for(const o of SOLIDS) if ((x-o[0])**2+(z-o[1])**2 < o[2]*o[2]) return true;
@@ -1990,7 +1991,7 @@ function deerTaken(a){
 function mountDeer(a){ if (deerTaken(a)) return; standUp(); if (lying) setLie(false); if (netOn()) window.MP.act(a.id,{ride:window.MP.id}); riding = a; a.ridden = true; a.wait = 0; cam.x = a.x; cam.z = a.z; cam.head = a.h; toast('고라니에 올라탔어요'); if (sndOn) chime(); firstTouch(); }
 function dismount(){
   const a = riding; if (!a) return; riding = null;
-  cam.x = clamp(a.x+Math.cos(a.h)*1.1,-38,54.8); cam.z = clamp(a.z+Math.sin(a.h)*1.1,-55.4,55.4);
+  cam.x = clamp(a.x+Math.cos(a.h)*1.1,-38,maxX(a.z)); cam.z = clamp(a.z+Math.sin(a.h)*1.1,-55.4,55.4);
   if (netOn()){ window.MP.act(a.id,{ride:null}); if (window.MP.leader()) releaseDeer(a); else a.ridden = false; }
   else releaseDeer(a);   // 잠깐 서 있다가 숲으로 돌아간다
 }
@@ -2107,11 +2108,11 @@ function frame(now){
   if (petting){ petting.t -= dt; if (petting.t<=0 || !animals.includes(petting.a) || Math.hypot(mx,my)>.35) petting = null; else mx = my = 0; }
   const sp = Math.min(1,Math.hypot(mx,my)), v = (riding ? (keys.ShiftLeft?12:8) : followRun ? 10 : (keys.ShiftLeft?8:4.6))*dt;
   const vx = Math.sin(cam.yaw)*my + Math.cos(cam.yaw)*mx, vz = -Math.cos(cam.yaw)*my + Math.sin(cam.yaw)*mx;
-  const nx = clamp(cam.x + vx*v, -38, 54.8), nz = clamp(cam.z + vz*v, -55.4, 55.4);
+  const nx = clamp(cam.x + vx*v, -38, maxX(cam.z)), nz = clamp(cam.z + vz*v, -55.4, 55.4);
   if (!blocked(nx,cam.z)) cam.x = nx; if (!blocked(cam.x,nz)) cam.z = nz;
   if (seated>=0){ const b = BENCHES[seated]; seatSide = pickSide(b); const q = seatAt(b,seatSide); cam.x = q[0]+Math.sin(b.h)*.04; cam.z = q[1]-Math.cos(b.h)*.04; cam.head = b.h; }
   if (riding && window.MP && window.MP.ok){ const r = ((window.MP.acts||{})[riding.id]||{}).ride;
-    if (r && r!==window.MP.id && window.MP.peers.has(r)){ const a = riding; riding = null; toast('다른 사람이 먼저 탔어요'); cam.x = clamp(a.x+Math.cos(a.h)*1.1,-38,54.8); cam.z = clamp(a.z+Math.sin(a.h)*1.1,-55.4,55.4); } }
+    if (r && r!==window.MP.id && window.MP.peers.has(r)){ const a = riding; riding = null; toast('다른 사람이 먼저 탔어요'); cam.x = clamp(a.x+Math.cos(a.h)*1.1,-38,maxX(a.z)); cam.z = clamp(a.z+Math.sin(a.h)*1.1,-55.4,55.4); } }
   if (riding){ cam.x = riding.x; cam.z = riding.z; cam.head = riding.h; }
   nearDeer = null; if (!riding && seated<0 && !lying){ let best = 3.2; for (const a of animals){ if (!a.deer || deerTaken(a)) continue; const d = Math.hypot(a.x-cam.x,a.z-cam.z); if (d<best){ best = d; nearDeer = a; } } }
   { const wv = !!(window.MP && window.MP.ok) && myPose()===0; if ($('bWave').hidden===wv) $('bWave').hidden = !wv; }
