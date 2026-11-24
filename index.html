@@ -722,8 +722,8 @@ const CAIRN = {x:57.3, z:-51.6};
   P.blob(CAIRN.x, y+.05, CAIRN.z, .07, .06, .07, [.66,.64,.6], sd++);   // 꼭대기 돌
   SOLIDS.push([CAIRN.x,CAIRN.z,.7]);
 }
-// 세잎클로버밭: 방울토마토 나무에서 호수 쪽으로 더 들어간 풀밭. 잎 세 장짜리 클로버가 빽빽하고 흰 꽃이 드문드문 핀다
-const CLOVER = {x:55.5, z:-43.5, r:4.2};
+// 세잎클로버밭: 동쪽 트랙 바로 바깥, 테니스장 가는 길목 풀밭. 잎 세 장짜리 클로버가 빽빽하고 흰 꽃이 드문드문 핀다
+const CLOVER = {x:46.4, z:-2.2, r:4.2};
 { const G1 = [.24,.5,.2], G2 = [.3,.58,.24], G3 = [.2,.44,.17];
   for (let i=0;i<330;i++){
     const a = Math.random()*6.283, d = Math.sqrt(Math.random())*CLOVER.r, cx = CLOVER.x+Math.cos(a)*d*1.15, cz = CLOVER.z+Math.sin(a)*d, cy = H(cx,cz)+.03+Math.random()*.05, rot = Math.random()*6.283, col = [G1,G2,G3][i%3];
