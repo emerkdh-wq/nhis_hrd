@@ -79,6 +79,16 @@ body.mp .toast{top:168px}
   display:flex;flex-direction:column;gap:10px;max-height:calc(100% - 24px);overflow-y:auto}
 .sheet>*{flex-shrink:0}
 .sheet[hidden]{display:none}
+.quote{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(14,21,23,.55);z-index:5}
+.quote[hidden]{display:none}
+.qcard{max-width:360px;width:100%;padding:26px 22px 18px;border-radius:20px;background:rgba(20,30,28,.94);border:1px solid var(--line);text-align:center;display:flex;flex-direction:column;gap:14px;animation:qin .45s ease}
+@keyframes qin{from{opacity:0;transform:translateY(18px) scale(.96)}to{opacity:1;transform:none}}
+.qk{font-size:12px;letter-spacing:.12em;color:var(--jade)}
+.qt{font-family:var(--display);font-size:21px;line-height:1.55;word-break:keep-all}
+.qa{font-size:13px;color:var(--muted)}
+.qbtns{display:flex;gap:10px;justify-content:center;margin-top:4px}
+.qbtns button{height:40px;padding:0 18px;border-radius:20px;border:1px solid var(--line);background:transparent;font-size:14px;color:inherit}
+.qbtns #qAgain{background:var(--jade);color:#10201b;border:0;font-weight:700}
 .gblist{display:flex;flex-direction:column;gap:8px;max-height:46vh;overflow-y:auto}
 .gbitem{padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.06)}
 .gbitem b{font-size:13px;color:var(--jade)}
@@ -199,6 +209,15 @@ body.mp .toast{top:168px}
   <div class="gbfoot"><button class="close" id="gbClose" type="button">닫기</button></div>
   <div class="gbkey" id="gbKeyRow" hidden><input id="gbKey" type="password" autocomplete="off" placeholder="관리자 비밀번호"><button id="gbKeyOk" type="button">확인</button></div>
 </section>
+
+<div class="quote" id="quote" hidden>
+  <div class="qcard">
+    <p class="qk">오늘의 명언</p>
+    <p class="qt" id="qText"></p>
+    <p class="qa" id="qAuth"></p>
+    <div class="qbtns"><button id="qAgain" type="button">한 번 더</button><button id="qClose" type="button">닫기</button></div>
+  </div>
+</div>
 
 <div class="rest" id="rest" hidden>
   <div class="ring"></div>
@@ -430,6 +449,24 @@ function fence(x0,z0,x1,z1,h,y0){
 }
 fence(-38,-56.6,41,-56.6,7,0); fence(-38,56.6,41,56.6,7,0);
 // 방명록 게시판: 남동쪽 끝 철망에 붙여 운동장 쪽을 본다
+// 명언 뽑기 기계: 운동장 북서쪽 모서리, 운동장 가운데를 바라본다
+const QM = {x:-35.4, z:-53.2, f:[.555,.832]}, QSIGN = new Mesh();
+{ const f = QM.f, rx = [f[1],-f[0]], rot = Math.atan2(f[0],f[1]), L = (lx,lz) => [QM.x+rx[0]*lx+f[0]*lz, QM.z+rx[1]*lx+f[1]*lz];
+  const RED = [.62,.13,.12], DK = [.16,.14,.14], GOLD = [.85,.68,.25];
+  P.box(QM.x,0,QM.z,1.05,.12,.85,DK,rot);                         // 받침
+  P.box(QM.x,.12,QM.z,.95,1.0,.75,RED,rot);                       // 몸통
+  P.box(QM.x,1.12,QM.z,1.0,.08,.8,GOLD,rot);                      // 어깨 띠
+  P.blob(QM.x,1.62,QM.z,.5,.46,.5,[.82,.88,.9],7);               // 유리 돔
+  const caps = [[.9,.75,.2],[.35,.6,.85],[.95,.95,.92],[.55,.78,.45],[.9,.45,.55],[.95,.6,.25]];
+  for (let i=0;i<14;i++){ const a = i*2.4, h = 1.35+(i%4)*.13, r = .44-Math.abs(h-1.62)*.55, q = [QM.x+Math.cos(a)*r, QM.z+Math.sin(a)*r];
+    P.blob(q[0],h,q[1],.085,.085,.085,caps[i%caps.length],i); }   // 돔에 비치는 캡슐들
+  P.blob(QM.x,2.1,QM.z,.12,.06,.12,RED,3);                         // 꼭지
+  { const q = L(.22,.39); P.cyl(q[0],.62,q[1],.1,.1,.06,10,[.9,.9,.88]); }   // 손잡이(돌리는 곳)
+  { const q = L(-.18,.38); P.box(q[0],.2,q[1],.26,.22,.05,[.05,.05,.06],rot); }   // 캡슐 나오는 구멍
+  const z0 = .385, y0 = .82, y1 = 1.08;   // 앞면 간판
+  const a = L(-.44,z0), b = L(.44,z0);
+  QSIGN.quad([a[0],y0,a[1]],[b[0],y0,b[1]],[b[0],y1,b[1]],[a[0],y1,a[1]],[1,1,1],[[0,0],[1,0],[1,1],[0,1]]);
+}
 const GB_AT = [34.5,55.5], BOARD = new Mesh();
 for (const sx of [-1.65,1.65]) P.box(GB_AT[0]+sx,0,GB_AT[1]+.12,.14,3,.14,C.wood);
 P.box(GB_AT[0],.82,GB_AT[1]+.16,3.3,1.96,.1,C.wood);
@@ -629,6 +666,7 @@ for(const b of [[1575,-260,34,30,96,[.92,.92,.9]],[1560,-70,30,26,120,[.8,.74,.6
 
 /* 나무 */
 const SOLIDS = [[47,-40,.4],[49,-20,.4],[49,42,.4]];
+SOLIDS.push([QM.x,QM.z,.65]);   // 명언 뽑기 기계
 function pine(x,z,h,c){
   if (inBld(x,z)) return;
   const y=H(x,z); P.cyl(x,y-.3,z,h*.035,h*.025,h*.4,5,C.trunk);
@@ -819,7 +857,9 @@ T.fence = meshTex('rgba(70,170,105,.95)',5);
   const notes = [['#cfd6cc',70,60,-.05],['#c9cfc4',800,52,.04],['#d3d8cf',96,250,.03],['#c6cdc2',300,190,-.03],['#cfd6cc',520,200,.04],['#c9cfc4',740,250,-.04],['#d3d8cf',420,330,-.02],['#c6cdc2',870,330,.05],['#cfd6cc',150,380,-.04]];
   for (const [col,nx,ny,r] of notes){ x.save(); x.translate(nx+70,ny+60); x.rotate(r); x.fillStyle = 'rgba(0,0,0,.25)'; x.fillRect(-66,-54,140,120); x.fillStyle = col; x.fillRect(-70,-60,140,120);
     x.fillStyle = 'rgba(40,55,45,.45)'; for (let l=0;l<4;l++) x.fillRect(-54,-34+l*24,90+rnd()*20-(l===3?40:0),5); x.fillStyle = '#5a6b60'; x.beginPath(); x.arc(0,-50,6,0,6.283); x.fill(); x.restore(); }
-  T.board = tex(c,false); } T.net = meshTex('rgba(245,245,240,.9)',4);
+  T.board = tex(c,false); }
+{ const c = cv(512,128), x = c.getContext('2d'); x.fillStyle = '#f4ead2'; x.fillRect(0,0,512,128); x.fillStyle = '#8f1d1a'; x.fillRect(8,8,496,112);
+  x.fillStyle = '#f7e6b0'; x.font = 'bold 64px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('명언 뽑기',256,68); T.qsign = tex(c,false); } T.net = meshTex('rgba(245,245,240,.9)',4);
 
 /* ───────── 셰이더 ───────── */
 const PREC = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n';
@@ -899,7 +939,7 @@ const FLAT = prog(
 /* ───────── 버퍼 ───────── */
 function vbo(data,dyn){ const b=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,b); gl.bufferData(gl.ARRAY_BUFFER,data,dyn?gl.DYNAMIC_DRAW:gl.STATIC_DRAW); return b; }
 const mk = m => ({b:vbo(new Float32Array(m.a)), n:m.a.length/11});
-const B = {board:mk(BOARD), props:mk(P), field:mk(FIELD), court:mk(COURT), tennis:mk(TENNIS), facade:mk(FACADE), dorm:mk(DORM), fence:mk(FENCE), net:mk(NET), lobby:mk(LOBBY), sock:mk(SOCK), main:mk(MAIN), mainLobby:mk(MAINLOBBY), nf:[mk(NF_P),mk(NF_D),mk(NF_L)], sf:[mk(SF_P),mk(SF_D),mk(SF_L)]};
+const B = {qsign:mk(QSIGN), board:mk(BOARD), props:mk(P), field:mk(FIELD), court:mk(COURT), tennis:mk(TENNIS), facade:mk(FACADE), dorm:mk(DORM), fence:mk(FENCE), net:mk(NET), lobby:mk(LOBBY), sock:mk(SOCK), main:mk(MAIN), mainLobby:mk(MAINLOBBY), nf:[mk(NF_P),mk(NF_D),mk(NF_L)], sf:[mk(SF_P),mk(SF_D),mk(SF_L)]};
 // 축구공: 흰 바탕에 검은 오각형 무늬(정이십면체 꼭짓점 12곳). 굴러간 거리만큼 실제로 회전시킨다
 const BALL_R = .14, ballRot = new Float32Array([1,0,0, 0,1,0, 0,0,1]);
 { const W = 512, Hh2 = 256, c = cv(W,Hh2), x = c.getContext('2d'), img = x.createImageData(W,Hh2), g = (1+Math.sqrt(5))/2;
@@ -1680,6 +1720,119 @@ syncWx(); liveWeather(); setInterval(liveWeather, 15*60*1000);
   b.onclick = () => { try { localStorage.setItem('cp-season',v[0]); } catch(e){} location.hash = v[0]||'auto'; location.reload(); }; $('seasons').appendChild(b); });
 $('bWx').onclick = () => { $('sheet').hidden = !$('sheet').hidden; };
 $('bClose').onclick = () => { $('sheet').hidden = true; };
+/* ───────── 명언 뽑기 ───────── */
+const QUOTES = [
+['천 리 길도 한 걸음부터 시작된다.','노자'],
+['물은 만물을 이롭게 하면서도 다투지 않는다.','노자'],
+['남을 아는 사람은 지혜롭고, 자신을 아는 사람은 밝다.','노자'],
+['만족할 줄 아는 사람이 부유한 사람이다.','노자'],
+['큰 그릇은 늦게 이루어진다.','노자'],
+['세상에서 가장 부드러운 것이 가장 단단한 것을 이긴다.','노자'],
+['배우고 때때로 익히면 또한 기쁘지 아니한가.','공자'],
+['아는 것을 안다 하고 모르는 것을 모른다 하는 것, 그것이 아는 것이다.','공자'],
+['세 사람이 길을 가면 그중에 반드시 나의 스승이 있다.','공자'],
+['아는 사람은 좋아하는 사람만 못하고, 좋아하는 사람은 즐기는 사람만 못하다.','공자'],
+['지나침은 모자람과 같다.','공자'],
+['내가 원하지 않는 일을 남에게 하지 마라.','공자'],
+['잘못하고도 고치지 않는 것, 이것을 잘못이라 한다.','공자'],
+['군자는 남과 어울리되 똑같아지지는 않는다.','공자'],
+['옛것을 익혀 새것을 안다.','공자'],
+['상대를 알고 나를 알면 백 번 싸워도 위태롭지 않다.','손자'],
+['싸우지 않고 이기는 것이 가장 좋은 승리다.','손자'],
+['어리석어 보여도 꾸준히 하면 산도 옮길 수 있다.','《열자》 우공이산'],
+['백 번 듣는 것이 한 번 보는 것만 못하다.','《한서》'],
+['미움은 미움으로 그치지 않는다. 미움은 사랑으로만 그친다.','《법구경》'],
+['건강은 가장 큰 이익이요, 만족은 가장 큰 재산이다.','《법구경》'],
+['날마다 좋은 날이다.','운문 선사'],
+['머무는 곳마다 주인이 되면, 서 있는 곳이 모두 참되다.','임제 선사'],
+['하루 일하지 않으면 하루 먹지 않는다.','백장 선사'],
+['산은 산이요, 물은 물이로다.','성철 스님'],
+['너 자신을 알라.','델포이 신전의 격언'],
+['성찰하지 않는 삶은 살 가치가 없다.','소크라테스'],
+['한 마리 제비가 왔다고 봄이 오는 것은 아니다.','아리스토텔레스'],
+['친구는 또 하나의 나다.','아리스토텔레스'],
+['인생은 짧고 예술은 길다.','히포크라테스'],
+['걷기는 사람에게 가장 좋은 약이다.','히포크라테스'],
+['오늘을 붙잡아라.','호라티우스'],
+['운명은 용감한 사람을 돕는다.','테렌티우스'],
+['천천히 서둘러라.','아우구스투스'],
+['숨 쉬는 한 희망은 있다.','키케로'],
+['감사하는 마음은 가장 큰 미덕이자 모든 미덕의 어머니다.','키케로'],
+['자기 자신을 다스리는 사람이 가장 강한 사람이다.','세네카'],
+['우리는 현실보다 상상 속에서 더 자주 괴로워한다.','세네카'],
+['사랑하라, 그리고 네가 원하는 것을 하라.','아우구스티누스'],
+['길을 찾지 못하면 길을 만들겠다.','한니발'],
+['걸으면 해결된다.','라틴어 격언'],
+['나는 생각한다, 그러므로 나는 존재한다.','데카르트'],
+['아는 것이 힘이다.','프랜시스 베이컨'],
+['인간은 생각하는 갈대다.','파스칼'],
+['마음에는 이성이 알지 못하는 이유가 있다.','파스칼'],
+['산다는 것은 숨 쉬는 것이 아니라 행동하는 것이다.','루소'],
+['나는 걸을 때만 깊이 생각할 수 있다.','루소'],
+['서두르지 말되, 쉬지도 마라.','괴테'],
+['나를 죽이지 못하는 것은 나를 더 강하게 만든다.','니체'],
+['살아야 할 이유를 아는 사람은 어떤 어려움도 견뎌 낸다.','니체'],
+['정말 위대한 생각은 모두 걷는 중에 떠오른다.','니체'],
+['모든 사람의 말에 귀를 기울이되, 말은 적게 하라.','셰익스피어 《햄릿》'],
+['끝이 좋으면 다 좋다.','셰익스피어'],
+['겨울이 오면 봄도 멀지 않으리.','셸리'],
+['진정한 발견은 새로운 풍경을 찾는 것이 아니라 새로운 눈을 갖는 것이다.','마르셀 프루스트'],
+['자연과 함께 걸을 때마다 우리는 찾던 것보다 더 많은 것을 얻는다.','존 뮤어'],
+['천재는 1퍼센트의 영감과 99퍼센트의 노력으로 이루어진다.','토머스 에디슨'],
+['나는 실패한 것이 아니다. 잘 안 되는 방법 만 가지를 찾았을 뿐이다.','토머스 에디슨'],
+['상상력은 지식보다 중요하다.','알베르트 아인슈타인'],
+['인생은 자전거와 같다. 균형을 잡으려면 계속 움직여야 한다.','알베르트 아인슈타인'],
+['우리가 두려워해야 할 것은 두려움 그 자체뿐이다.','프랭클린 루스벨트'],
+['당신이 허락하지 않으면 누구도 당신을 열등하게 만들 수 없다.','엘리너 루스벨트'],
+['절대, 절대, 절대 포기하지 마라.','윈스턴 처칠'],
+['약한 사람은 용서하지 못한다. 용서는 강한 사람의 몫이다.','마하트마 간디'],
+['오늘은 남은 인생의 첫날이다.','찰스 디드리히'],
+['어둠을 탓하기보다 촛불 하나를 켜라.','격언'],
+['나무를 심기 가장 좋은 때는 20년 전이었고, 그다음으로 좋은 때는 지금이다.','중국 속담'],
+['일곱 번 넘어져도 여덟 번 일어난다.','일본 속담'],
+['걱정한다고 걱정이 없어진다면 걱정이 없겠네.','티베트 속담'],
+['물방울이 끊임없이 떨어지면 바위도 뚫는다.','격언'],
+['뜻이 있는 곳에 길이 있다.','서양 격언'],
+['하늘은 스스로 돕는 자를 돕는다.','서양 격언'],
+['로마는 하루아침에 이루어지지 않았다.','서양 격언'],
+['연습이 완벽을 만든다.','서양 격언'],
+['정직이 최선의 방책이다.','서양 격언'],
+['웃음은 최고의 약이다.','서양 격언'],
+['행동은 말보다 더 크게 말한다.','서양 격언'],
+['고요한 물이 깊다.','서양 격언'],
+['인내는 쓰지만 그 열매는 달다.','서양 격언'],
+['늦었다고 생각할 때가 가장 빠를 때다.','격언'],
+['시작이 반이다.','속담'],
+['티끌 모아 태산.','속담'],
+['고생 끝에 낙이 온다.','속담'],
+['가는 말이 고와야 오는 말이 곱다.','속담'],
+['웃는 얼굴에 침 못 뱉는다.','속담'],
+['백지장도 맞들면 낫다.','속담'],
+['비 온 뒤에 땅이 굳어진다.','속담'],
+['구슬이 서 말이라도 꿰어야 보배다.','속담'],
+['첫술에 배부르랴.','속담'],
+['하늘이 무너져도 솟아날 구멍이 있다.','속담'],
+['우물을 파도 한 우물을 파라.','속담'],
+['아는 길도 물어 가라.','속담'],
+['돌다리도 두들겨 보고 건너라.','속담'],
+['호랑이에게 물려 가도 정신만 차리면 산다.','속담'],
+['말 한마디로 천 냥 빚을 갚는다.','속담'],
+['공든 탑이 무너지랴.','속담'],
+['열 번 찍어 안 넘어가는 나무 없다.','속담'],
+['윗물이 맑아야 아랫물이 맑다.','속담'],
+['콩 심은 데 콩 나고 팥 심은 데 팥 난다.','속담'],
+['호랑이는 죽어서 가죽을 남기고, 사람은 죽어서 이름을 남긴다.','속담'],
+];
+let quoteLast = -1, quoteBusy = false;
+function drawQuote(){
+  if (quoteBusy) return; quoteBusy = true; firstTouch();
+  cam.head = Math.atan2(QM.x-cam.x,-(QM.z-cam.z)); move.x = move.y = 0;
+  if (sndOn){ for (let i=0;i<5;i++) tone(220+i*30,.05,.06,i*.11); tone(660,.06,.25,.65); tone(990,.04,.35,.75); }   // 손잡이 돌리는 소리, 캡슐 떨어지는 소리
+  let i; do { i = Math.floor(Math.random()*QUOTES.length); } while (i===quoteLast && QUOTES.length>1); quoteLast = i;
+  setTimeout(() => { $('qText').textContent = QUOTES[i][0]; $('qAuth').textContent = '— '+QUOTES[i][1]; $('quote').hidden = false; quoteBusy = false; }, 800);
+}
+$('qAgain').onclick = () => { $('quote').hidden = true; drawQuote(); };
+$('qClose').onclick = () => { $('quote').hidden = true; };
 /* ───────── 방명록 ───────── */
 let gbRetry = 0, gbTry = 0, gbOff = null, ntOff = null, gbLast = 0, gbList = [], ntList = [], gbErr = false, gbLoaded = false, gbAdmin = false;
 const gbKey = () => store2.get('cp-gbkey','');
@@ -1799,7 +1952,7 @@ $('bSnd').onclick = () => setSound(!sndOn);
 /* ───────── 쉬기 ───────── */
 let umbCol = null;
 let resting = false, restT0 = 0, seated = -1, nearBench = -1, sitLabel = '', lying = false;
-let nearTomato = false, eating = null, heartT = -99, nearBoard = false;
+let nearTomato = false, eating = null, heartT = -99, nearBoard = false, nearQuote = false;
 function eatTomato(){
   const now = performance.now()/1000, ready = TOMATO.fruits.map((f,i) => i).filter(i => now-TOMATO.eaten[i]>90 && !TOMATO.fruits[i][3]);
   const pick = (ready.length ? ready : TOMATO.fruits.map((f,i) => i).filter(i => now-TOMATO.eaten[i]>90))[0];
@@ -1877,7 +2030,7 @@ function pickSide(b){
   return (window.MP.id > o.id) ? 1 : -1;   // 둘 다 가운데면 아이디로 나눈다
 }
 function standUp(){ if (seated<0) return; const b = BENCHES[seated], q = seatAt(b,seatSide); cam.x = q[0]+Math.sin(b.h)*.55; cam.z = q[1]-Math.cos(b.h)*.55; seated = -1; }
-$('bSit').onclick = () => { if (riding) dismount(); else if (lying) setLie(false); else if (seated>=0) standUp(); else if (nearBoard) openGB(); else if (nearDeer) mountDeer(nearDeer); else if (nearRabbit) petRabbit(nearRabbit); else if (nearTomato) eatTomato(); else if (nearBench>=0){ const b0 = BENCHES[nearBench]; if (!freeSeat(b0)) return; const side = pickSide(b0); seated = nearBench; seatSide = side; const b = b0, q = seatAt(b,side); cam.x = q[0]; cam.z = q[1]; cam.head = b.h; if (sndOn) chime(); firstTouch(); } };
+$('bSit').onclick = () => { if (riding) dismount(); else if (lying) setLie(false); else if (seated>=0) standUp(); else if (nearQuote) drawQuote(); else if (nearBoard) openGB(); else if (nearDeer) mountDeer(nearDeer); else if (nearRabbit) petRabbit(nearRabbit); else if (nearTomato) eatTomato(); else if (nearBench>=0){ const b0 = BENCHES[nearBench]; if (!freeSeat(b0)) return; const side = pickSide(b0); seated = nearBench; seatSide = side; const b = b0, q = seatAt(b,side); cam.x = q[0]; cam.z = q[1]; cam.head = b.h; if (sndOn) chime(); firstTouch(); } };
 function setRest(on){
   if (on){ standUp(); setLie(false); dismount(); }
   resting = on; $('rest').hidden = !on; restT0 = performance.now();
@@ -1983,11 +2136,12 @@ function frame(now){
     if (lab!==followLabel){ followLabel = lab; $('bFollow').hidden = !lab; if (lab) $('bFollow').textContent = lab; $('bFollow').setAttribute('aria-pressed', !!follow); } }
   nearRabbit = null; if (!riding && !petting && seated<0 && !lying){ let best = 2.2; for (const a of animals){ if (a.deer || animalBusy(a)) continue; const d = Math.hypot(a.x-cam.x,a.z-cam.z); if (d<best){ best = d; nearRabbit = a; } } }
   if (petting){ const a = petting.a; cam.head = Math.atan2(a.x-cam.x,-(a.z-cam.z)); }
+  nearQuote = !riding && !petting && !eating && seated<0 && !lying && !resting && $('quote').hidden && Math.hypot(cam.x-(QM.x+QM.f[0]*1.1),cam.z-(QM.z+QM.f[1]*1.1))<2.4;
   nearBoard = !riding && !petting && !eating && seated<0 && !lying && !resting && $('gbook').hidden && Math.abs(cam.x-GB_AT[0])<3 && GB_AT[1]-cam.z<3.4;
   nearTomato = !riding && !petting && !eating && seated<0 && !lying && !resting && Math.hypot(cam.x-TOMATO.x,cam.z-TOMATO.z)<2.8 && TOMATO.eaten.some(t => performance.now()/1000-t>90);
   if (eating){ eating.t -= dt; if (eating.t<=0) eating = null; }
   nearBench = -1; if (seated<0){ let best = 2.4*2.4; BENCHES.forEach((b,i) => { const d = (b.x-cam.x)**2+(b.z-cam.z)**2; if (d<best && freeSeat(b)){ best = d; nearBench = i; } }); }
-  { const lab = resting ? '' : riding ? '내리기' : (seated>=0 || lying) ? '일어나기' : petting ? '' : nearBoard ? '방명록 보기' : nearDeer ? '고라니 타기' : nearTomato && !eating ? '방울토마토 먹기' : nearRabbit ? (nearRabbit.cat ? '르샤 쓰다듬기' : '토끼 쓰다듬기') : nearBench>=0 ? '벤치에 앉기' : '';
+  { const lab = resting ? '' : riding ? '내리기' : (seated>=0 || lying) ? '일어나기' : petting ? '' : nearQuote ? '명언 뽑기' : nearBoard ? '방명록 보기' : nearDeer ? '고라니 타기' : nearTomato && !eating ? '방울토마토 먹기' : nearRabbit ? (nearRabbit.cat ? '르샤 쓰다듬기' : '토끼 쓰다듬기') : nearBench>=0 ? '벤치에 앉기' : '';
     if (lab!==sitLabel){ sitLabel = lab; $('bSit').hidden = !lab; if (lab) $('bSit').textContent = lab; $('bSit').classList.toggle('quiet', lab==='일어나기'); } }
   const gy = groundY(cam.x,cam.z);
   if (sp>.08){ let dh = Math.atan2(vx,-vz)-cam.head; dh = Math.atan2(Math.sin(dh),Math.cos(dh)); cam.head += dh*Math.min(1,dt*9); }
@@ -2041,7 +2195,7 @@ function frame(now){
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,T.white); gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,T.black);
   gl.uniformMatrix4fv(LIT.u.uM,false,IDENT); bindLit(terrB); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,terrI);
   gl.drawElements(gl.TRIANGLES,terr.idx.length,gl.UNSIGNED_SHORT,0);
-  drawLit(B.props); drawLit(B.board,T.board); drawLit(B.field,T.field); drawLit(B.court,T.court); drawLit(B.tennis,T.tennis);
+  drawLit(B.props); drawLit(B.board,T.board); drawLit(B.qsign,T.qsign); drawLit(B.field,T.field); drawLit(B.court,T.court); drawLit(B.tennis,T.tennis);
   // 본관 조명은 밤 11시에 꺼지고 다음 날 저녁에 다시 켜진다. 가로등은 밤새 켜져 있다
   // 흐리거나 비·눈이 오는 날은 낮에도 본관 불을 켠다
   const bkSec = seoulSec(ms), bkOn = bkSec>=23*3600 || bkSec<6*3600 ? 0 : 1, bkLight = Math.max(env.night, .75*sstep(.6,.85,cur.cover))*bkOn;
