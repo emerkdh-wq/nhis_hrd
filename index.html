@@ -708,6 +708,20 @@ for(const z of [-50,-38,-26,-16,40,52]){
     for (let j=0;j<4;j++) TOMATO.fruits.push([tx+Math.cos(a)*rad+Math.cos(a+1.6)*(j-1.5)*.06, ty+h-j*.07, tz+Math.sin(a)*rad+Math.sin(a+1.6)*(j-1.5)*.06, j===3 && c%3===0]); }
   TOMATO.eaten = TOMATO.fruits.map(() => -1e9);
 }
+// 돌탑: 방울토마토 나무 옆. 작은 돌을 둥글게 쌓아 위로 갈수록 좁아진다 (높이 약 1.3m, 어른 가슴께)
+const CAIRN = {x:49.3, z:-51.6};
+{ const by = H(CAIRN.x,CAIRN.z)-.04, greys = [[.55,.54,.5],[.48,.47,.44],[.62,.6,.56],[.42,.41,.39],[.58,.55,.5],[.5,.5,.48]];
+  let y = by, sd = 0; const L = 13;
+  for (let l=0;l<L;l++){
+    const t = l/(L-1), R = .52*(1-t)+.07, n = Math.max(1, Math.round(R*15)), sh = .1+.02*Math.sin(l*1.7), off = l*.9;
+    for (let k=0;k<n;k++){ const a = off+k/n*6.283, r = n===1 ? 0 : R*(.62+.1*Math.sin(k*2.3+l)), sz = n===1 ? .1 : Math.min(.17, R*.95/Math.max(1,n/6));
+      P.blob(CAIRN.x+Math.cos(a)*r, y+sh*.5, CAIRN.z+Math.sin(a)*r, sz*(1+.25*Math.sin(k+l)), sh*.55, sz*(.85+.2*Math.cos(k*1.3)), greys[(k+l)%greys.length], sd++); }
+    if (n>3) P.blob(CAIRN.x, y+sh*.5, CAIRN.z, R*.6, sh*.55, R*.6, greys[l%greys.length], sd++);   // 가운데 속돌
+    y += sh*.92;
+  }
+  P.blob(CAIRN.x, y+.05, CAIRN.z, .07, .06, .07, [.66,.64,.6], sd++);   // 꼭대기 돌
+  SOLIDS.push([CAIRN.x,CAIRN.z,.7]);
+}
 // 세잎클로버밭: 방울토마토 나무에서 호수 쪽으로 더 들어간 풀밭. 잎 세 장짜리 클로버가 빽빽하고 흰 꽃이 드문드문 핀다
 const CLOVER = {x:52.2, z:-45.5, r:2.4};
 { const G1 = [.24,.5,.2], G2 = [.3,.58,.24], G3 = [.2,.44,.17];
