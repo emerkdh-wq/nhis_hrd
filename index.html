@@ -1929,7 +1929,7 @@ let umbCol = null;
 let resting = false, restT0 = 0, seated = -1, nearBench = -1, sitLabel = '', lying = false;
 let nearClover = false, searching = null, nearTomato = false, eating = null, heartT = -99, nearBoard = false, nearQuote = false;
 /* ───────── 버려진 자전거 ───────── */
-// 처음엔 호숫가 풀밭에 옆으로 쓰러져 있다. 고치면(3번에 1번 성공) 세워지고 탈 수 있다. 고친 상태는 내 화면에만 남는다
+// 처음엔 호숫가 풀밭에 옆으로 쓰러져 있다. 고치면(3번에 1번 성공) 세워지고 탈 수 있다. 내리면 그 자리에서 다시 고장 난다. 고친 상태는 내 화면에만 남는다
 const BIKE = {x:60.6, z:-36.8, h:.9, fixed:false, ph:0};
 let biking = false, nearBike = false, fixing = null, nearCairn = false, cairnShown = false;
 function drawBike(m,x,gy,z,h,ph,lying){
@@ -1955,7 +1955,8 @@ function endFix(ok){
   else toast('🔧 고치기 실패');
 }
 function mountBike(){ biking = true; firstTouch(); cam.x = BIKE.x; cam.z = BIKE.z; cam.head = BIKE.h; cam.yaw = BIKE.h; follow = null; }
-function dismountBike(){ biking = false; BIKE.x = cam.x; BIKE.z = cam.z; BIKE.h = cam.head; const r = [Math.cos(cam.head),Math.sin(cam.head)]; cam.x += r[0]*.7; cam.z += r[1]*.7; }
+function dismountBike(){ biking = false; BIKE.fixed = false; BIKE.x = cam.x; BIKE.z = cam.z; BIKE.h = cam.head; toast('자전거가 다시 고장 나서 쓰러졌다');   // 내리면 다시 고장: 다음에 타려면 또 고쳐야 한다
+  const r = [Math.cos(cam.head),Math.sin(cam.head)]; cam.x += r[0]*.7; cam.z += r[1]*.7; }
 function prayCairn(){ firstTouch(); cam.head = Math.atan2(CAIRN.x-cam.x,-(CAIRN.z-cam.z)); toast('🙏 두 손 모아 소원을 빌었다'); heartT = performance.now()/1000; if (sndOn) chime(); }
 // 네잎클로버 찾기: 쪼그려 앉아 잠시 뒤적인 뒤, 5번에 1번꼴로 네잎클로버를 찾는다
 function findClover(){
