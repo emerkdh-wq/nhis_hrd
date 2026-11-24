@@ -900,6 +900,42 @@ const FLAT = prog(
 function vbo(data,dyn){ const b=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,b); gl.bufferData(gl.ARRAY_BUFFER,data,dyn?gl.DYNAMIC_DRAW:gl.STATIC_DRAW); return b; }
 const mk = m => ({b:vbo(new Float32Array(m.a)), n:m.a.length/11});
 const B = {board:mk(BOARD), props:mk(P), field:mk(FIELD), court:mk(COURT), tennis:mk(TENNIS), facade:mk(FACADE), dorm:mk(DORM), fence:mk(FENCE), net:mk(NET), lobby:mk(LOBBY), sock:mk(SOCK), main:mk(MAIN), mainLobby:mk(MAINLOBBY), nf:[mk(NF_P),mk(NF_D),mk(NF_L)], sf:[mk(SF_P),mk(SF_D),mk(SF_L)]};
+// 축구공: 흰 바탕에 검은 오각형 무늬(정이십면체 꼭짓점 12곳). 굴러간 거리만큼 실제로 회전시킨다
+const BALL_R = .14, ballRot = new Float32Array([1,0,0, 0,1,0, 0,0,1]);
+{ const W = 512, Hh2 = 256, c = cv(W,Hh2), x = c.getContext('2d'), img = x.createImageData(W,Hh2), g = (1+Math.sqrt(5))/2;
+  const V = [[0,1,g],[0,1,-g],[0,-1,g],[0,-1,-g],[1,g,0],[1,-g,0],[-1,g,0],[-1,-g,0],[g,0,1],[g,0,-1],[-g,0,1],[-g,0,-1]].map(v => { const l = Math.hypot(...v); return v.map(a => a/l); });
+  const dot = (a,b) => a[0]*b[0]+a[1]*b[1]+a[2]*b[2], cross = (a,b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+  const nb = V.map(v => V.find(w => w!==v && dot(v,w)>.4));   // 오각형 방향을 맞출 이웃 꼭짓점
+  for (let py=0; py<Hh2; py++){ const ph = (py+.5)/Hh2*Math.PI;
+    for (let px=0; px<W; px++){ const th = (px+.5)/W*2*Math.PI, P = [Math.sin(ph)*Math.cos(th), Math.cos(ph), Math.sin(ph)*Math.sin(th)];
+      let bi = 0, bd = -2; for (let k=0;k<12;k++){ const d = dot(P,V[k]); if (d>bd){ bd = d; bi = k; } }
+      const C = V[bi], ang = Math.acos(Math.min(1,bd)), e1 = (() => { const n = nb[bi], t = n.map((a,j) => a-C[j]*dot(n,C)), l = Math.hypot(...t); return t.map(a => a/l); })(), e2 = cross(C,e1);
+      const t = P.map((a,j) => a-C[j]*bd), a = Math.atan2(dot(t,e2),dot(t,e1)), seg = 2*Math.PI/5, m = ((a%seg)+seg)%seg - seg/2;
+      const R = .33*Math.cos(Math.PI/5)/Math.cos(m), edge = ang - R;   // 오각형 안이면 음수
+      let col = edge<0 ? 28 : 244; if (Math.abs(edge)<.012) col = 120;   // 경계는 살짝 회색으로 부드럽게
+      const o = (py*W+px)*4; img.data[o] = img.data[o+1] = col; img.data[o+2] = col===244 ? 238 : col; img.data[o+3] = 255; } }
+  x.putImageData(img,0,0); T.ball = tex(c,false); }
+const BALLMESH = new Mesh();
+{ const NU = 28, NV = 16, pt = (u,v) => { const th = u*2*Math.PI, ph = v*Math.PI; return [Math.sin(ph)*Math.cos(th), Math.cos(ph), Math.sin(ph)*Math.sin(th)]; };
+  for (let i=0;i<NU;i++) for (let j=0;j<NV;j++){ const u0 = i/NU, u1 = (i+1)/NU, v0 = j/NV, v1 = (j+1)/NV;
+    const a = pt(u0,v0), b = pt(u1,v0), c2 = pt(u1,v1), d = pt(u0,v1), W = [1,1,1];
+    BALLMESH.v(a,a,W,u0,1-v0); BALLMESH.v(d,d,W,u0,1-v1); BALLMESH.v(c2,c2,W,u1,1-v1);
+    BALLMESH.v(a,a,W,u0,1-v0); BALLMESH.v(c2,c2,W,u1,1-v1); BALLMESH.v(b,b,W,u1,1-v0); } }
+B.ball = mk(BALLMESH);
+function rollBall(dx,dz){   // 바닥을 dx,dz만큼 굴렀을 때: 축 (dz,0,-dx), 각도 거리/반지름
+  const d = Math.hypot(dx,dz); if (d<1e-5) return; const ax = [dz/d,0,-dx/d], an = d/BALL_R, c = Math.cos(an), s2 = Math.sin(an), t = 1-c;
+  const R = [t*ax[0]*ax[0]+c, t*ax[0]*ax[1]+s2*ax[2], t*ax[0]*ax[2]-s2*ax[1],
+             t*ax[0]*ax[1]-s2*ax[2], t*ax[1]*ax[1]+c, t*ax[1]*ax[2]+s2*ax[0],
+             t*ax[0]*ax[2]+s2*ax[1], t*ax[1]*ax[2]-s2*ax[0], t*ax[2]*ax[2]+c];   // 열 우선 3x3
+  const o = ballRot.slice(), m = (A,i,j) => A[j*3+i];
+  for (let j=0;j<3;j++) for (let i=0;i<3;i++) ballRot[j*3+i] = m(R,i,0)*m(o,0,j)+m(R,i,1)*m(o,1,j)+m(R,i,2)*m(o,2,j);
+  // 오차가 쌓이지 않게 가끔 정규 직교화
+  const c0 = [ballRot[0],ballRot[1],ballRot[2]], l0 = Math.hypot(...c0); c0.forEach((v,k) => ballRot[k] = v/l0);
+  const c1 = [ballRot[3],ballRot[4],ballRot[5]], dd = c1[0]*ballRot[0]+c1[1]*ballRot[1]+c1[2]*ballRot[2]; for (let k=0;k<3;k++) c1[k] -= dd*ballRot[k]; const l1 = Math.hypot(...c1); c1.forEach((v,k) => ballRot[3+k] = v/l1);
+  ballRot[6] = ballRot[1]*ballRot[5]-ballRot[2]*ballRot[4]; ballRot[7] = ballRot[2]*ballRot[3]-ballRot[0]*ballRot[5]; ballRot[8] = ballRot[0]*ballRot[4]-ballRot[1]*ballRot[3];
+}
+function ballMatrix(){ const r = BALL_R, R = ballRot, x = ball.rx??ball.x, y = (ball.ry??ball.y)+.15, z = ball.rz??ball.z;
+  return new Float32Array([R[0]*r,R[1]*r,R[2]*r,0, R[3]*r,R[4]*r,R[5]*r,0, R[6]*r,R[7]*r,R[8]*r,0, x,y,z,1]); }
 const terrB = vbo(terr.a), terrI = gl.createBuffer();
 gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,terrI); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,terr.idx,gl.STATIC_DRAW);
 const gondB = vbo(new Float32Array(10*30*11),true);
@@ -1492,7 +1528,7 @@ function stepBall(dt,dx,dz,sp,run){
   ballPhys(dt,false);
   // 화면에 그리는 공은 실제 위치를 부드럽게 따라가게 해서, 다른 사람이 찬 공이 순간이동하지 않게 한다
   if (ball.rx===undefined || Math.hypot(ball.x-ball.rx,ball.z-ball.rz)>6){ ball.rx = ball.x; ball.rz = ball.z; ball.ry = ball.y; }
-  else { const f = 1-Math.exp(-dt*14); ball.rx += (ball.x-ball.rx)*f; ball.rz += (ball.z-ball.rz)*f; ball.ry += (ball.y-ball.ry)*f; }
+  else { const f = 1-Math.exp(-dt*14), ox = ball.rx, oz = ball.rz; ball.rx += (ball.x-ball.rx)*f; ball.rz += (ball.z-ball.rz)*f; ball.ry += (ball.y-ball.ry)*f; rollBall(ball.rx-ox, ball.rz-oz); }
 }
 function ballPhys(dt,quiet){
   if (ball.goalT>0) ball.goalT -= dt;   // 골이 들어가도 공은 골대 안에 그대로 남아 다시 찰 수 있다
@@ -2034,12 +2070,13 @@ function frame(now){
       if (ta) for (const k in ta){ if (k[0]!=='f') continue; const i = +k.slice(1), t = now-(sn-ta[k])/1000; if (i>=0 && i<TOMATO.eaten.length && t>TOMATO.eaten[i]) TOMATO.eaten[i] = t; } }
     TOMATO.fruits.forEach((f,i) => { if (now-TOMATO.eaten[i]>90) gm.blob(f[0],f[1],f[2],.05,.05,.05,f[3]?[.45,.62,.2]:[.9,.12,.08],i); });
     const hu = now-heartT; if (third) drawHearts(gm,cam.x,gy,cam.z,hu); }
-  drawBirds(gm,time); gm.blob(ball.rx??ball.x,(ball.ry??ball.y)+.15,ball.rz??ball.z,.14,.14,.14,[.96,.96,.94],3);
+  drawBirds(gm,time);
   if (tennisOn && cur.rain<.5) drawTennis(gm,time);
   const torch = []; drawWalkers(gm,ms,torch);
   if (torch.length) lampFlat.set(torch[1],36);   // 테니스 조명이 꺼진 시간이라 그 자리를 손전등 빛으로 쓴다
   gl.bindBuffer(gl.ARRAY_BUFFER,gondB); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(gm.a),gl.DYNAMIC_DRAW);
   drawLit({b:gondB,n:gm.a.length/11});
+  drawLit(B.ball,T.ball,T.black,ballMatrix());   // 무늬 있는 축구공
   for (const d of catDraws){ const M = CATM[d.pose]; gl.uniform4f(LIT.u.uCat, d.pose==='walk'?1:0, d.ph, d.amp, time%1000); drawLit(M.buf,M.t,T.black,catMatrix(d)); }
   gl.uniform4f(LIT.u.uCat,0,0,0,0);
   catDraws.length = 0;
