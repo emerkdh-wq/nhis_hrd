@@ -86,6 +86,9 @@ body.mp .toast{top:168px}
 .qk{font-size:12px;letter-spacing:.12em;color:var(--jade)}
 .qt{font-family:var(--display);font-size:21px;line-height:1.55;word-break:keep-all}
 .qa{font-size:13px;color:var(--muted)}
+.quote.rare .qcard{border-color:#e9c46a;box-shadow:0 0 0 1px rgba(233,196,106,.35),0 0 28px rgba(233,196,106,.25)}
+.quote.rare .qk{color:#e9c46a;font-weight:700}
+.qa[hidden]{display:none}
 .qbtns{display:flex;gap:10px;justify-content:center;margin-top:4px}
 .qbtns button{height:40px;padding:0 18px;border-radius:20px;border:1px solid var(--line);background:transparent;font-size:14px;color:inherit}
 .qbtns #qAgain{background:var(--jade);color:#10201b;border:0;font-weight:700}
@@ -212,7 +215,7 @@ body.mp .toast{top:168px}
 
 <div class="quote" id="quote" hidden>
   <div class="qcard">
-    <p class="qk">오늘의 명언</p>
+    <p class="qk" id="qk">오늘의 명언</p>
     <p class="qt" id="qText"></p>
     <p class="qa" id="qAuth"></p>
     <div class="qbtns"><button id="qAgain" type="button">한 번 더</button><button id="qClose" type="button">닫기</button></div>
@@ -1822,6 +1825,15 @@ const QUOTES = [
 ['윗물이 맑아야 아랫물이 맑다.','속담'],
 ['콩 심은 데 콩 나고 팥 심은 데 팥 난다.','속담'],
 ['호랑이는 죽어서 가죽을 남기고, 사람은 죽어서 이름을 남긴다.','속담'],
+// 직장인 딴짓 & B급 유머 (레어 캡슐)
+['당신의 메신저 상태가 \'자리 비움\'으로 바뀌어도 아무도 모를 행운이 따릅니다.','','rare'],
+['오늘 당신의 키보드 타건 소리가 유독 경쾌합니다. (일하는 척하기 딱 좋은 날)','','rare'],
+['금일 행운의 숫자: 6시 00분. 정시 퇴근의 기운이 강하게 감돕니다.','','rare'],
+['업무 효율을 높이는 가장 좋은 방법은 5분간 고라니를 타는 것입니다.','','rare'],
+['지금 마시는 커피 한 잔이 오늘 오후의 멘탈을 지탱해 줄 것입니다.','','rare'],
+['메일함의 \'읽지 않음\' 숫자는 잠시 잊으세요. 당신의 마음의 평화가 먼저입니다.','','rare'],
+['누군가 당신을 찾고 있습니다... 하지만 급한 일은 아니니 천천히 하세요.','','rare'],
+['오늘 점심은 칼로리가 0kcal입니다. 맛있게 드세요.','','rare'],
 ];
 let quoteLast = -1, quoteBusy = false;
 function drawQuote(){
@@ -1829,7 +1841,10 @@ function drawQuote(){
   cam.head = Math.atan2(QM.x-cam.x,-(QM.z-cam.z)); move.x = move.y = 0;
   if (sndOn){ for (let i=0;i<5;i++) tone(220+i*30,.05,.06,i*.11); tone(660,.06,.25,.65); tone(990,.04,.35,.75); }   // 손잡이 돌리는 소리, 캡슐 떨어지는 소리
   let i; do { i = Math.floor(Math.random()*QUOTES.length); } while (i===quoteLast && QUOTES.length>1); quoteLast = i;
-  setTimeout(() => { $('qText').textContent = QUOTES[i][0]; $('qAuth').textContent = '— '+QUOTES[i][1]; $('quote').hidden = false; quoteBusy = false; }, 800);
+  setTimeout(() => { const q = QUOTES[i], rare = q[2]==='rare';
+    $('qk').textContent = rare ? '✨ 레어 캡슐 ✨' : '오늘의 명언'; $('quote').classList.toggle('rare',rare);
+    $('qText').textContent = q[0]; $('qAuth').textContent = q[1] ? '— '+q[1] : ''; $('qAuth').hidden = !q[1]; $('quote').hidden = false; quoteBusy = false;
+    if (rare && sndOn) chime(); }, 800);
 }
 $('qAgain').onclick = () => { $('quote').hidden = true; drawQuote(); };
 $('qClose').onclick = () => { $('quote').hidden = true; };
