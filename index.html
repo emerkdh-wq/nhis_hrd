@@ -57,6 +57,12 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--jade);outline-o
 /* 앉기·눕기에서 일어나기: 쉬기 화면의 '일어나기'와 같은 차분한 버튼 */
 .acts #bSit.quiet{height:44px;min-width:0;padding:0 20px;border-radius:22px;border:1px solid var(--line);background:var(--panel);color:var(--text);
   font-family:var(--body);font-size:14px;font-weight:400;box-shadow:none;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+#bJump{position:relative;overflow:visible}
+/* 트램펄린 착지 타이밍 원: 바깥 원이 줄어들어 버튼 테두리와 겹치는 순간이 착지 순간 */
+#jg{position:absolute;left:50%;top:50%;width:78px;height:78px;margin:-39px 0 0 -39px;border-radius:50%;border:3px solid rgba(255,255,255,.85);pointer-events:none;opacity:0;transition:opacity .12s, border-color .08s, box-shadow .08s}
+#jg.on{opacity:1}
+#jg.hit{border-color:#8fd0b8;box-shadow:0 0 14px 4px rgba(143,208,184,.75)}
+#bJump.ready{border-color:#8fd0b8;box-shadow:0 0 0 2px rgba(143,208,184,.6)}
 #bWave,#bJump{border:1px solid var(--line);background:var(--panel);color:var(--text);min-width:0;font-family:var(--body);font-size:14px;font-weight:400;box-shadow:none;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 #tags{position:fixed;inset:0;pointer-events:none;overflow:hidden}
 #tags span{position:absolute;transform:translate(-50%,-100%);padding:2px 8px;border-radius:10px;background:rgba(14,21,23,.62);color:var(--text);font-size:12px;white-space:nowrap}
@@ -182,7 +188,7 @@ body.mp .toast{top:168px}
   <button id="bSit" type="button" hidden>벤치에 앉기</button>
   <button id="bFollow" type="button" aria-pressed="false" hidden>따라가기</button>
   <button id="bWave" type="button" hidden>손 흔들기</button>
-  <button id="bJump" type="button" hidden>점프</button>
+  <button id="bJump" type="button" hidden>점프<span id="jg" aria-hidden="true"></span></button>
 </div>
 <p class="hint" id="hint">왼쪽 아래를 밀어 걷고, 화면을 끌어 둘러보세요</p>
 
@@ -1676,8 +1682,8 @@ $('nick').addEventListener('input', e => { const v = e.target.value.trim().slice
 $('nick').addEventListener('keydown', e => e.stopPropagation());
 let myWave = -99, myWaveId = 0, myJumpId = 0, myJumpH = .55;
 // 점프: 위로 튀어 올랐다가 중력으로 내려온다. 트램펄린 위에서는 착지할 때 다시 튕겨 오르고,
-// 내려오는 끝무렵(또는 막 착지한 순간)에 맞춰 점프를 누르면 점점 더 높이 올라간다 (최대 5m)
-const GRAV = 9.8, JUMP_H = .55, TRAMP_H0 = 1.1, TRAMP_MAX = 5;
+// 착지하는 순간(앞뒤 0.25초)에 맞춰 점프를 누르면 점점 더 높이 올라간다 (최대 10m). 버튼 둘레의 줄어드는 원이 타이밍을 알려 준다
+const GRAV = 9.8, JUMP_H = .55, TRAMP_H0 = 1.1, TRAMP_MAX = 10;
 let prevBounce = 0, lateBoost = false, maxToast = false, jumpY = 0, jumpV = 0, airborne = false, bounceH = 0, boostQueued = false, landedAt = -9;
 const onTramp = () => Math.hypot(cam.x-TRAMP.x,cam.z-TRAMP.z) < TRAMP.r-.05;
 const jumpStarY = y => Math.min(1, y/.35);   // 떠 있는 높이에 따라 팔다리를 벌린다
@@ -2189,10 +2195,16 @@ function frame(now){
     if (jumpY<=0){ jumpY = 0; airborne = false; landedAt = performance.now()/1000;
       if (onTramp() && myPose()===0){   // 트램펄린: 스프링 반동
         prevBounce = bounceH; lateBoost = boostQueued; const h = boostQueued ? bounceH*1.45+.25 : bounceH*.55;
-        if (h>.28){ launch(h); if (sndOn) tone(180+Math.min(h,5)*40,.07,.16); if (h>=TRAMP_MAX-.01 && !maxToast){ maxToast = true; toast('🚀 최고 높이 5m!'); } }
+        if (h>.28){ launch(h); if (sndOn) tone(180+Math.min(h,5)*40,.07,.16); if (h>=TRAMP_MAX-.01 && !maxToast){ maxToast = true; toast('🚀 최고 높이 10m!'); } }
         else { bounceH = 0; maxToast = false; }
       } else bounceH = 0; } }
   if (myPose()!==0 && airborne){ airborne = false; jumpY = 0; jumpV = 0; }
+  { // 착지 타이밍 원: 착지 1초 전부터 바깥 원이 줄어들어 착지 순간 버튼 테두리에 겹친다
+    const jg = $('jg'), nowS = performance.now()/1000; let show = false, sc = 1, hit = false;
+    if (onTramp() && airborne && jumpV<0){ const tl = (jumpV+Math.sqrt(jumpV*jumpV+2*GRAV*jumpY))/GRAV; if (tl<1){ show = true; sc = 1+tl*2.4; hit = tl<.25 || boostQueued; } }
+    else if (onTramp() && airborne && jumpV>0 && nowS-landedAt<.25 && !lateBoost && prevBounce>0){ show = true; sc = 1; hit = true; }
+    jg.classList.toggle('on',show); jg.classList.toggle('hit',hit); $('bJump').classList.toggle('ready',show && hit);
+    if (show) jg.style.transform = 'scale('+sc.toFixed(3)+')'; }
   { const any = animals.some(a => !a.ridden && a.x<54), lab = '';   // 따라가기는 '나타났어요' 알림을 눌러서 시작한다
     if (lab!==followLabel){ followLabel = lab; $('bFollow').hidden = !lab; if (lab) $('bFollow').textContent = lab; $('bFollow').setAttribute('aria-pressed', !!follow); } }
   nearRabbit = null; if (!riding && !petting && seated<0 && !lying){ let best = 2.2; for (const a of animals){ if (a.deer || animalBusy(a)) continue; const d = Math.hypot(a.x-cam.x,a.z-cam.z); if (d<best){ best = d; nearRabbit = a; } } }
