@@ -1279,10 +1279,10 @@ function personRaw(m,x,y,z,h,ph,sw,shirt,o){
     m.seg(at(0,hip,-.11),at(.42,.3,-.14),.085,PANTS); m.seg(at(.42,.3,-.14),at(.62,.06,-.12),.075,PANTS);
     m.seg(at(0,hip,.11),at(.42,.3,.14),.085,PANTS); m.seg(at(.42,.3,.14),at(.62,.06,.12),.075,PANTS);
     m.seg(at(0,top-.04,-.24),at(.3,.36,-.2),.06,shirt); m.seg(at(0,top-.04,.24),at(.3,.36,.2),.06,shirt);
-  } else if (o.star>0){   // 점프: 팔은 위로 V자, 다리는 옆으로 쫙 벌린다 (o.star: 0~1 벌린 정도)
+  } else if (o.star>0){   // 점프: 팔은 양옆으로 수평에 가깝게 들고, 다리는 옆으로 쫙 벌린다 (o.star: 0~1 벌린 정도)
     const s2 = o.star;
     for(const sd of [-1,1]){ m.seg(at(0,hip,sd*.11),at(0,.05+s2*.2,sd*(.13+s2*.42)),.085,PANTS);
-      m.seg(at(0,top-.04,sd*.25),at(0,top-.58+s2*1.04,sd*(.3+s2*.36)),.06,shirt); }
+      m.seg(at(0,top-.04,sd*.25),at(0,top-.58+s2*.42,sd*(.3+s2*.42)),.06,shirt); }
   } else {
     m.seg(at(0,hip,-.11),at(sn*.42,.05+Math.max(0,-sn)*.12,-.11),.085,PANTS);
     m.seg(at(0,hip,.11),at(-sn*.42,.05+Math.max(0,sn)*.12,.11),.085,PANTS);
