@@ -723,6 +723,15 @@ const CAIRN = {x:57.3, z:-51.6};
   P.blob(CAIRN.x, y+.05, CAIRN.z, .07, .06, .07, [.66,.64,.6], sd++);   // 꼭대기 돌
   SOLIDS.push([CAIRN.x,CAIRN.z,.7]);
 }
+// 매립형 트램펄린: 테니스장과 방명록 사이 나무들 틈. 땅에 묻혀 있어 매트가 지면과 거의 같은 높이다
+const TRAMP = {x:46.2, z:46.2, r:1.55};
+{ const N = 32, MAT = [.07,.07,.08], PAD = [.16,.36,.68], gy = (x,z) => H(x,z)+.14;
+  for (let k=0;k<N;k++){ const a0 = k/N*6.283, a1 = (k+1)/N*6.283, R = TRAMP.r;
+    const p0 = [TRAMP.x,gy(TRAMP.x,TRAMP.z),TRAMP.z], p1 = [TRAMP.x+Math.cos(a0)*R, 0, TRAMP.z+Math.sin(a0)*R], p2 = [TRAMP.x+Math.cos(a1)*R, 0, TRAMP.z+Math.sin(a1)*R];
+    p1[1] = gy(p1[0],p1[2]); p2[1] = gy(p2[0],p2[2]); P.tri(p0,p2,p1,MAT);
+    const q1 = [TRAMP.x+Math.cos(a0)*(R+.12), 0, TRAMP.z+Math.sin(a0)*(R+.12)], q2 = [TRAMP.x+Math.cos(a1)*(R+.12), 0, TRAMP.z+Math.sin(a1)*(R+.12)];
+    q1[1] = gy(q1[0],q1[2])+.03; q2[1] = gy(q2[0],q2[2])+.03; P.seg(q1,q2,.09,PAD); }   // 둘레 보호 패드
+}
 // 세잎클로버밭: 동쪽 트랙 바로 바깥, 테니스장 가는 길목 풀밭. 잎 세 장짜리 클로버가 빽빽하고 흰 꽃이 드문드문 핀다
 const CLOVER = {x:46.4, z:-2.2, r:4.2};
 { const G1 = [.24,.5,.2], G2 = [.3,.58,.24], G3 = [.2,.44,.17];
@@ -1665,10 +1674,21 @@ let nick = store2.get('cp-nick','') || ('손님'+Math.floor(100+Math.random()*90
 $('nick').value = store2.get('cp-nick','');
 $('nick').addEventListener('input', e => { const v = e.target.value.trim().slice(0,10); nick = v || nick; store2.set('cp-nick',v); });
 $('nick').addEventListener('keydown', e => e.stopPropagation());
-let myWave = -99, myWaveId = 0, jumpT = 0, myJumpId = 0;
-const JUMP_DUR = .75, JUMP_H = .55;
-const jumpLift = u => 4*JUMP_H*u*(1-u), jumpStar = u => Math.sin(Math.PI*Math.min(1,u*1.15));   // 높이와 팔다리 벌림(0~1)
-function doJump(){ if (jumpT>0 || myPose()!==0 || biking) return; jumpT = JUMP_DUR; myJumpId = Date.now(); firstTouch();
+let myWave = -99, myWaveId = 0, myJumpId = 0, myJumpH = .55;
+// 점프: 위로 튀어 올랐다가 중력으로 내려온다. 트램펄린 위에서는 착지할 때 다시 튕겨 오르고,
+// 내려오는 끝무렵(또는 막 착지한 순간)에 맞춰 점프를 누르면 점점 더 높이 올라간다 (최대 5m)
+const GRAV = 9.8, JUMP_H = .55, TRAMP_H0 = 1.1, TRAMP_MAX = 5;
+let maxToast = false, jumpY = 0, jumpV = 0, airborne = false, bounceH = 0, boostQueued = false, landedAt = -9;
+const onTramp = () => Math.hypot(cam.x-TRAMP.x,cam.z-TRAMP.z) < TRAMP.r-.05;
+const jumpStarY = y => Math.min(1, y/.35);   // 떠 있는 높이에 따라 팔다리를 벌린다
+const peerArc = (t,h) => { const d = 2*Math.sqrt(2*h/GRAV), u = t/d; return u>=0 && u<1 ? 4*h*u*(1-u) : -1; };
+function launch(h){ h = Math.min(TRAMP_MAX, h); airborne = true; jumpY = Math.max(jumpY,0); jumpV = Math.sqrt(2*GRAV*h); bounceH = h; myJumpId = Date.now(); myJumpH = Math.round(h*100)/100; boostQueued = false; }
+function doJump(){
+  if (myPose()!==0 || biking) return; firstTouch();
+  const now = performance.now()/1000;
+  if (airborne){ if (onTramp() && jumpV<0 && jumpY<.6) boostQueued = true; return; }   // 착지 직전에 누르면 다음 반동이 커진다
+  if (onTramp() && now-landedAt<.22 && bounceH>0) launch(bounceH*1.45+.25);          // 착지 직후에 눌러도 성공
+  else launch(onTramp() ? TRAMP_H0 : JUMP_H);
   if (sndOn){ tone(330,.06,.12); tone(660,.05,.18,.08); } }
 $('bJump').onclick = doJump;
 addEventListener('keydown', e => { if (e.code==='Space' && !e.repeat && document.activeElement && document.activeElement.tagName!=='INPUT' && document.activeElement.tagName!=='TEXTAREA'){ e.preventDefault(); doJump(); } });
@@ -1694,15 +1714,15 @@ function drawPeers(m,dt,time,VP){
     const mv = Math.hypot(p.rx-ox,p.rz-oz); p.ph += mv*1.6; const moving = mv/Math.max(dt,1e-3) > .4;
     if (p.w && p.w!==p._lastW){ p._lastW = p.w; if (p._seenW){ p.waveUntil = time+2.6; if (Math.hypot(p.x-cam.x,p.z-cam.z)<40) toast((p.n||'손님')+'님이 손을 흔들어요'); } }
     p._seenW = true;
-    if (p.j && p.j!==p._lastJ){ p._lastJ = p.j; if (p._seenJ) p.jumpAt = time; } p._seenJ = true;
+    if (p.j && p.j!==p._lastJ){ p._lastJ = p.j; if (p._seenJ){ p.jumpAt = time; p.jumpH = Math.min(TRAMP_MAX, p.jh||JUMP_H); } } p._seenJ = true;
     const gyp = groundY(p.rx,p.rz), pose = p.p|0;
     if (pose===6 && p._pose!==6) p.heartAt = time+.3; p._pose = pose; drawHearts(m,p.rx,gyp,p.rz,time-(p.heartAt||-99));
     const shirt = hex3((SHIRTS[p.s|0]||SHIRTS[0])[1]), waving = p.waveUntil>time;
     if (pose===7) drawBike(m,p.rx,gyp,p.rz,p.rh,-p.ph*2,false);   // 자전거 탄 사람
     if (pose===4) drawAnimal(m,{deer:true,x:p.rx,z:p.rz,h:p.rh,v:moving?7:0,ph:p.ph*3,ridden:true});
-    const pju = (time-(p.jumpAt??-99))/JUMP_DUR, pj = pju>=0 && pju<1 && pose===0;
-    person(m,p.rx,gyp+(pose===4?.58:pose===7?.38:0)+(pj?jumpLift(pju):0),p.rz,p.rh,p.ph,moving&&pose===0?1:0,shirt,
-      {chair:pose===1,lie:pose===2,sit:pose===3,ride:pose===4||pose===7,star:pj?jumpStar(pju):0,crouch:pose===5?time+.01:0,eat:pose===6?time+.01:0,hat:p.c|0,
+    const pjy = pose===0 ? peerArc(time-(p.jumpAt??-99), p.jumpH||JUMP_H) : -1, pj = pjy>=0;
+    person(m,p.rx,gyp+(pose===4?.58:pose===7?.38:0)+(pj?pjy:0),p.rz,p.rh,p.ph,moving&&pose===0?1:0,shirt,
+      {chair:pose===1,lie:pose===2,sit:pose===3,ride:pose===4||pose===7,star:pj?jumpStarY(pjy):0,crouch:pose===5?time+.01:0,eat:pose===6?time+.01:0,hat:p.c|0,
        umb:p.u===1?[.98,.82,.12]:p.u===2?[.86,.14,.13]:null,wave:waving&&pose===0?time:0});
     // 이름표
     let el = tagEls.get(id); if (!el){ el = document.createElement('span'); $('tags').appendChild(el); tagEls.set(id,el); }
@@ -1718,7 +1738,7 @@ function drawPeers(m,dt,time,VP){
     $('mpline').textContent = lastMpCount ? '지금 함께 있는 사람 '+lastMpCount+'명' : '지금은 혼자 걷고 있어요'; }
   const pose = myPose();
   MP.send({n:nick, x:Math.round(cam.x*10)/10, z:Math.round(cam.z*10)/10, h:Math.round(cam.head*100)/100, p:pose, s:shirtI, c:hatI,
-    u:cur.rain>.3&&umbCol&&pose!==2&&pose!==4 ? (umbCol[1]>.5?1:2) : 0, w:myWaveId, j:myJumpId});
+    u:cur.rain>.3&&umbCol&&pose!==2&&pose!==4 ? (umbCol[1]>.5?1:2) : 0, w:myWaveId, j:myJumpId, jh:myJumpH});
 }
 const fmtClock = new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit',hour12:false});
 const fmtHour = new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Seoul',hour:'numeric',hour12:false});
@@ -2161,7 +2181,15 @@ function frame(now){
   nearDeer = null; if (!riding && seated<0 && !lying){ let best = 3.2; for (const a of animals){ if (!a.deer || deerTaken(a)) continue; const d = Math.hypot(a.x-cam.x,a.z-cam.z); if (d<best){ best = d; nearDeer = a; } } }
   { const wv = !!(window.MP && window.MP.ok) && myPose()===0; if ($('bWave').hidden===wv) $('bWave').hidden = !wv; }
   { const jv = myPose()===0 && !biking && !resting; if ($('bJump').hidden===jv) $('bJump').hidden = !jv; }
-  if (jumpT>0) jumpT = Math.max(0, jumpT-dt);
+  if (airborne){
+    jumpV -= GRAV*dt; jumpY += jumpV*dt;
+    if (jumpY<=0){ jumpY = 0; airborne = false; landedAt = performance.now()/1000;
+      if (onTramp() && myPose()===0){   // 트램펄린: 스프링 반동
+        const h = boostQueued ? bounceH*1.45+.25 : bounceH*.55;
+        if (h>.28){ launch(h); if (sndOn) tone(180+Math.min(h,5)*40,.07,.16); if (h>=TRAMP_MAX-.01 && !maxToast){ maxToast = true; toast('🚀 최고 높이 5m!'); } }
+        else { bounceH = 0; maxToast = false; }
+      } else bounceH = 0; } }
+  if (myPose()!==0 && airborne){ airborne = false; jumpY = 0; jumpV = 0; }
   { const any = animals.some(a => !a.ridden && a.x<54), lab = '';   // 따라가기는 '나타났어요' 알림을 눌러서 시작한다
     if (lab!==followLabel){ followLabel = lab; $('bFollow').hidden = !lab; if (lab) $('bFollow').textContent = lab; $('bFollow').setAttribute('aria-pressed', !!follow); } }
   nearRabbit = null; if (!riding && !petting && seated<0 && !lying){ let best = 2.2; for (const a of animals){ if (a.deer || animalBusy(a)) continue; const d = Math.hypot(a.x-cam.x,a.z-cam.z); if (d<best){ best = d; nearRabbit = a; } } }
@@ -2183,10 +2211,10 @@ function frame(now){
   const gy = groundY(cam.x,cam.z);
   if (sp>.08){ let dh = Math.atan2(vx,-vz)-cam.head; dh = Math.atan2(Math.sin(dh),Math.cos(dh)); cam.head += dh*Math.min(1,dt*9); }
   walk += sp*dt*7.5;
-  const targetEye = (riding ? 2.25 : biking ? 2.0 : petting ? .95 : lying ? .35 : resting ? .95 : seated>=0 ? 1.2 : 1.65) + gy; cam.eye += (targetEye-cam.eye)*(1-Math.exp(-dt*3));
+  const targetEye = jumpY + (riding ? 2.25 : biking ? 2.0 : petting ? .95 : lying ? .35 : resting ? .95 : seated>=0 ? 1.2 : 1.65) + gy; cam.eye += (targetEye-cam.eye)*(1-Math.exp(-dt*(airborne||jumpY>0?25:3)));
   let eye;
   if (third){
-    const cp = Math.cos(cam.pitch), dist = 4.6, ty = (riding ? 2.7 : biking ? 2.45 : petting ? 1.5 : lying ? .9 : resting ? 1.2 : seated>=0 ? 1.65 : 2.1) + gy;
+    const cp = Math.cos(cam.pitch), dist = 4.6, ty = jumpY + (riding ? 2.7 : biking ? 2.45 : petting ? 1.5 : lying ? .9 : resting ? 1.2 : seated>=0 ? 1.65 : 2.1) + gy;
     eye = [cam.x - Math.sin(cam.yaw)*cp*dist, Math.max(.35, ty + .5 - Math.sin(cam.pitch)*dist), cam.z + Math.cos(cam.yaw)*cp*dist];
   } else eye = [cam.x, cam.eye + (reduceMotion?0:Math.sin(walk)*.035*sp), cam.z];
   stepAnimals(dt,time); stepBirds(dt,time); stepBall(dt,vx,vz,sp,!!keys.ShiftLeft);
@@ -2253,8 +2281,7 @@ function frame(now){
   if (cur.rain>.3){ if (!umbCol) umbCol = Math.random()<.5 ? [.98,.82,.12] : [.86,.14,.13]; } else if (cur.rain<.1) umbCol = null;
   if (third){ const rb = riding && riding.v>0 ? Math.abs(Math.sin(riding.ph))*.14*1.45 : 0;
     if (riding){ cam.x = riding.x; cam.z = riding.z; cam.head = riding.h; }
-    const ju = jumpT>0 ? 1-jumpT/JUMP_DUR : -1;
-    person(gm,cam.x,gy+(riding ? .58+rb : biking ? .38 : 0)+(ju>=0?jumpLift(ju):0),cam.z,cam.head,walk,riding?0:sp,hex3(SHIRTS[shirtI][1]),{sit:resting,chair:seated>=0,lie:lying,ride:!!riding||biking,star:ju>=0?jumpStar(ju):0,eat:eating?time+.01:0,crouch:(petting||searching||fixing)?time+.01:0,hat:hatI,umb:cur.rain>.3&&!riding?umbCol:null,wave:time-myWave<2.6&&myPose()===0?time:0}); }
+    person(gm,cam.x,gy+(riding ? .58+rb : biking ? .38 : 0)+jumpY,cam.z,cam.head,walk,riding?0:sp,hex3(SHIRTS[shirtI][1]),{sit:resting,chair:seated>=0,lie:lying,ride:!!riding||biking,star:airborne?jumpStarY(jumpY):0,eat:eating?time+.01:0,crouch:(petting||searching||fixing)?time+.01:0,hat:hatI,umb:cur.rain>.3&&!riding?umbCol:null,wave:time-myWave<2.6&&myPose()===0?time:0}); }
   drawPeers(gm,dt,time,VP);
   for(const a of animals) if (!(a.ridden && riding!==a)) drawAnimal(gm,a);   // 다른 사람이 탄 고라니는 그 사람 아래에 함께 그린다(따로 그리면 늦게 따라오는 것처럼 보인다)
   { const now = performance.now()/1000;
