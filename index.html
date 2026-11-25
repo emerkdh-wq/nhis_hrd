@@ -723,8 +723,8 @@ const CAIRN = {x:57.3, z:-51.6};
   P.blob(CAIRN.x, y+.05, CAIRN.z, .07, .06, .07, [.66,.64,.6], sd++);   // 꼭대기 돌
   SOLIDS.push([CAIRN.x,CAIRN.z,.7]);
 }
-// 매립형 트램펄린: 테니스장과 방명록 사이 나무들 틈. 땅에 묻혀 있어 매트가 지면과 거의 같은 높이다
-const TRAMP = {x:46.2, z:46.2, r:1.55};
+// 매립형 트램펄린: 테니스장과 방명록 사이, 호숫가 쪽 풀밭. 땅에 묻혀 있어 매트가 지면과 거의 같은 높이다
+const TRAMP = {x:58.6, z:46.4, r:1.55};
 { const N = 32, MAT = [.07,.07,.08], PAD = [.16,.36,.68], gy = (x,z) => H(x,z)+.14;
   for (let k=0;k<N;k++){ const a0 = k/N*6.283, a1 = (k+1)/N*6.283, R = TRAMP.r;
     const p0 = [TRAMP.x,gy(TRAMP.x,TRAMP.z),TRAMP.z], p1 = [TRAMP.x+Math.cos(a0)*R, 0, TRAMP.z+Math.sin(a0)*R], p2 = [TRAMP.x+Math.cos(a1)*R, 0, TRAMP.z+Math.sin(a1)*R];
@@ -1317,7 +1317,7 @@ function personRaw(m,x,y,z,h,ph,sw,shirt,o){
     m.blob(b[0],b[1],b[2],.34,.025,.34,[.86,.74,.45],4); m.blob(c[0],c[1],c[2],.16,.1,.16,[.88,.77,.48],5);
     m.blob(c[0],c[1]-.05,c[2],.165,.025,.165,[.5,.2,.17],6); }
 }
-const maxX = z => z<-22 ? 64 : 54.8;   // 북동쪽 호숫가 풀밭(돌탑·클로버밭)은 더 동쪽까지 걸어갈 수 있다
+const maxX = z => (z<-22 || z>38) ? 64 : 54.8;   // 북동쪽 호숫가 풀밭(돌탑·클로버밭)은 더 동쪽까지 걸어갈 수 있다
 const groundY = (x,z) => x>40.6 ? H(x,z)+.02 : .04;
 function blocked(x,z){
   for(const o of SOLIDS) if ((x-o[0])**2+(z-o[1])**2 < o[2]*o[2]) return true;
@@ -1678,7 +1678,7 @@ let myWave = -99, myWaveId = 0, myJumpId = 0, myJumpH = .55;
 // 점프: 위로 튀어 올랐다가 중력으로 내려온다. 트램펄린 위에서는 착지할 때 다시 튕겨 오르고,
 // 내려오는 끝무렵(또는 막 착지한 순간)에 맞춰 점프를 누르면 점점 더 높이 올라간다 (최대 5m)
 const GRAV = 9.8, JUMP_H = .55, TRAMP_H0 = 1.1, TRAMP_MAX = 5;
-let maxToast = false, jumpY = 0, jumpV = 0, airborne = false, bounceH = 0, boostQueued = false, landedAt = -9;
+let prevBounce = 0, lateBoost = false, maxToast = false, jumpY = 0, jumpV = 0, airborne = false, bounceH = 0, boostQueued = false, landedAt = -9;
 const onTramp = () => Math.hypot(cam.x-TRAMP.x,cam.z-TRAMP.z) < TRAMP.r-.05;
 const jumpStarY = y => Math.min(1, y/.35);   // 떠 있는 높이에 따라 팔다리를 벌린다
 const peerArc = (t,h) => { const d = 2*Math.sqrt(2*h/GRAV), u = t/d; return u>=0 && u<1 ? 4*h*u*(1-u) : -1; };
@@ -1686,8 +1686,11 @@ function launch(h){ h = Math.min(TRAMP_MAX, h); airborne = true; jumpY = Math.ma
 function doJump(){
   if (myPose()!==0 || biking) return; firstTouch();
   const now = performance.now()/1000;
-  if (airborne){ if (onTramp() && jumpV<0 && jumpY<.6) boostQueued = true; return; }   // 착지 직전에 누르면 다음 반동이 커진다
-  if (onTramp() && now-landedAt<.22 && bounceH>0) launch(bounceH*1.45+.25);          // 착지 직후에 눌러도 성공
+  if (airborne){ const tLand = (jumpV+Math.sqrt(jumpV*jumpV+2*GRAV*jumpY))/GRAV;   // 착지까지 남은 시간
+    if (onTramp() && jumpV<0 && tLand<.25) boostQueued = true;
+    else if (onTramp() && jumpV>0 && now-landedAt<.25 && !lateBoost && prevBounce>0){ lateBoost = true; launch(prevBounce*1.45+.25); }   // 막 튕겨 오른 직후에 눌러도 성공
+    return; }   // 착지하는 순간(0.25초 전부터)에 누르면 다음 반동이 커진다
+  if (onTramp() && now-landedAt<.25 && bounceH>0) launch(bounceH*1.45+.25);          // 착지 직후 0.25초 안에 눌러도 성공
   else launch(onTramp() ? TRAMP_H0 : JUMP_H);
   if (sndOn){ tone(330,.06,.12); tone(660,.05,.18,.08); } }
 $('bJump').onclick = doJump;
@@ -2185,7 +2188,7 @@ function frame(now){
     jumpV -= GRAV*dt; jumpY += jumpV*dt;
     if (jumpY<=0){ jumpY = 0; airborne = false; landedAt = performance.now()/1000;
       if (onTramp() && myPose()===0){   // 트램펄린: 스프링 반동
-        const h = boostQueued ? bounceH*1.45+.25 : bounceH*.55;
+        prevBounce = bounceH; lateBoost = boostQueued; const h = boostQueued ? bounceH*1.45+.25 : bounceH*.55;
         if (h>.28){ launch(h); if (sndOn) tone(180+Math.min(h,5)*40,.07,.16); if (h>=TRAMP_MAX-.01 && !maxToast){ maxToast = true; toast('🚀 최고 높이 5m!'); } }
         else { bounceH = 0; maxToast = false; }
       } else bounceH = 0; } }
