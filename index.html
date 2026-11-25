@@ -1688,7 +1688,8 @@ let prevBounce = 0, lateBoost = false, maxToast = false, jumpY = 0, jumpV = 0, a
 const onTramp = () => Math.hypot(cam.x-TRAMP.x,cam.z-TRAMP.z) < TRAMP.r-.05;
 const jumpStarY = y => Math.min(1, y/.35);   // 떠 있는 높이에 따라 팔다리를 벌린다
 const peerArc = (t,h) => { const d = 2*Math.sqrt(2*h/GRAV), u = t/d; return u>=0 && u<1 ? 4*h*u*(1-u) : -1; };
-function launch(h){ h = Math.min(TRAMP_MAX, h); airborne = true; jumpY = Math.max(jumpY,0); jumpV = Math.sqrt(2*GRAV*h); bounceH = h; myJumpId = Date.now(); myJumpH = Math.round(h*100)/100; boostQueued = false; }
+function launch(h){ h = Math.min(TRAMP_MAX, h); airborne = true; jumpY = Math.max(jumpY,0); jumpV = Math.sqrt(2*GRAV*h); bounceH = h; myJumpId = Date.now(); myJumpH = Math.round(h*100)/100; boostQueued = false;
+  if (netOn() && window.MP.jump) window.MP.jump(myJumpH); }   // 다른 사람 화면에도 같은 높이로 뛰는 모습이 보인다
 function doJump(){
   if (myPose()!==0 || biking) return; firstTouch();
   const now = performance.now()/1000;
@@ -1723,15 +1724,17 @@ function drawPeers(m,dt,time,VP){
     const mv = Math.hypot(p.rx-ox,p.rz-oz); p.ph += mv*1.6; const moving = mv/Math.max(dt,1e-3) > .4;
     if (p.w && p.w!==p._lastW){ p._lastW = p.w; if (p._seenW){ p.waveUntil = time+2.6; if (Math.hypot(p.x-cam.x,p.z-cam.z)<40) toast((p.n||'손님')+'님이 손을 흔들어요'); } }
     p._seenW = true;
-    if (p.j && p.j!==p._lastJ){ p._lastJ = p.j; if (p._seenJ){ p.jumpAt = time; p.jumpH = Math.min(TRAMP_MAX, p.jh||JUMP_H); } } p._seenJ = true;
+    { const ja = (MP.acts||{})['j'+id];   // 이 사람이 뛴 소식: 뛴 시각부터 지난 만큼 포물선을 이어 그린다
+      if (ja && ja.t && ja.t!==p._lastJt){ p._lastJt = ja.t; const ago = (MP.now()-ja.t)/1000; if (ago<4){ p.jumpAt = time-Math.max(0,ago); p.jumpH = Math.min(TRAMP_MAX, ja.h||JUMP_H); } } }
+    const bikeRider = ((MP.acts||{}).bike||{}).r===id;
     const gyp = groundY(p.rx,p.rz), pose = p.p|0;
     if (pose===6 && p._pose!==6) p.heartAt = time+.3; p._pose = pose; drawHearts(m,p.rx,gyp,p.rz,time-(p.heartAt||-99));
     const shirt = hex3((SHIRTS[p.s|0]||SHIRTS[0])[1]), waving = p.waveUntil>time;
-    if (pose===7) drawBike(m,p.rx,gyp,p.rz,p.rh,-p.ph*2,false);   // 자전거 탄 사람
+    if (pose===7 || bikeRider) drawBike(m,p.rx,gyp,p.rz,p.rh,-p.ph*2,false);   // 자전거 탄 사람
     if (pose===4) drawAnimal(m,{deer:true,x:p.rx,z:p.rz,h:p.rh,v:moving?7:0,ph:p.ph*3,ridden:true});
-    const pjy = pose===0 ? peerArc(time-(p.jumpAt??-99), p.jumpH||JUMP_H) : -1, pj = pjy>=0;
-    person(m,p.rx,gyp+(pose===4?.58:pose===7?.38:0)+(pj?pjy:0),p.rz,p.rh,p.ph,moving&&pose===0?1:0,shirt,
-      {chair:pose===1,lie:pose===2,sit:pose===3,ride:pose===4||pose===7,star:pj?jumpStarY(pjy):0,crouch:pose===5?time+.01:0,eat:pose===6?time+.01:0,hat:p.c|0,
+    const pjy = pose===0 && !bikeRider ? peerArc(time-(p.jumpAt??-99), p.jumpH||JUMP_H) : -1, pj = pjy>=0;
+    person(m,p.rx,gyp+(pose===4?.58:(pose===7||bikeRider)?.38:0)+(pj?pjy:0),p.rz,p.rh,p.ph,moving&&pose===0?1:0,shirt,
+      {chair:pose===1,lie:pose===2,sit:pose===3,ride:pose===4||pose===7||bikeRider,star:pj?jumpStarY(pjy):0,crouch:pose===5?time+.01:0,eat:pose===6?time+.01:0,hat:p.c|0,
        umb:p.u===1?[.98,.82,.12]:p.u===2?[.86,.14,.13]:null,wave:waving&&pose===0?time:0});
     // 이름표
     let el = tagEls.get(id); if (!el){ el = document.createElement('span'); $('tags').appendChild(el); tagEls.set(id,el); }
@@ -1746,8 +1749,8 @@ function drawPeers(m,dt,time,VP){
   if (MP.peers.size!==lastMpCount){ lastMpCount = MP.peers.size; $('mpline').hidden = false; document.body.classList.add('mp');
     $('mpline').textContent = lastMpCount ? '지금 함께 있는 사람 '+lastMpCount+'명' : '지금은 혼자 걷고 있어요'; }
   const pose = myPose();
-  MP.send({n:nick, x:Math.round(cam.x*10)/10, z:Math.round(cam.z*10)/10, h:Math.round(cam.head*100)/100, p:pose, s:shirtI, c:hatI,
-    u:cur.rain>.3&&umbCol&&pose!==2&&pose!==4 ? (umbCol[1]>.5?1:2) : 0, w:myWaveId, j:myJumpId, jh:myJumpH});
+  MP.send({n:nick, x:Math.round(cam.x*10)/10, z:Math.round(cam.z*10)/10, h:Math.round(cam.head*100)/100, p:pose===7?0:pose, s:shirtI, c:hatI,
+    u:cur.rain>.3&&umbCol&&pose!==2&&pose!==4 ? (umbCol[1]>.5?1:2) : 0, w:myWaveId});
 }
 const fmtClock = new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit',hour12:false});
 const fmtHour = new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Seoul',hour:'numeric',hour12:false});
@@ -1971,7 +1974,7 @@ let umbCol = null;
 let resting = false, restT0 = 0, seated = -1, nearBench = -1, sitLabel = '', lying = false;
 let nearClover = false, searching = null, nearTomato = false, eating = null, heartT = -99, nearBoard = false, nearQuote = false;
 /* ───────── 버려진 자전거 ───────── */
-// 처음엔 호숫가 풀밭에 옆으로 쓰러져 있다. 고치면(3번에 1번 성공) 세워지고 탈 수 있다. 내리면 그 자리에서 다시 고장 난다. 고친 상태는 내 화면에만 남는다
+// 처음엔 호숫가 풀밭에 옆으로 쓰러져 있다. 고치면(3번에 1번 성공) 세워지고 탈 수 있다. 내리면 그 자리에서 다시 고장 난다. 위치와 고쳐진 상태는 모두가 함께 본다
 const BIKE = {x:60.6, z:-36.8, h:.9, fixed:false, ph:0};
 let biking = false, nearBike = false, fixing = null, nearCairn = false, cairnShown = false;
 function drawBike(m,x,gy,z,h,ph,lying){
@@ -1987,17 +1990,25 @@ function drawBike(m,x,gy,z,h,ph,lying){
   m.seg(P2(.34,1.0,-.24),P2(.34,1.0,.24),.018,TY2);   // 핸들
   m.blob(SEAT[0],SEAT[1]+.03,SEAT[2],.11,.035,.06,TY2,1);   // 안장
 }
+// 자전거 상태는 모두가 함께 쓴다(world/acts/bike: 위치·고쳐짐·탄 사람). 마지막에 버려진 자리에 계속 남는다
+function bikeShared(){ return netOn() ? ((window.MP.acts||{}).bike || null) : null; }
+function bikeTakenByOther(){ const b = bikeShared(); return !!(b && b.r && b.r!==window.MP.id && window.MP.peers.has(b.r)); }
+function syncBike(){
+  const b = bikeShared(); if (!b || biking) return;
+  if (typeof b.x==='number'){ BIKE.x = b.x; BIKE.z = b.z; BIKE.h = b.h||0; } BIKE.fixed = !!b.f;
+}
+function pubBike(rider){ if (netOn()) window.MP.act('bike',{x:Math.round(BIKE.x*100)/100, z:Math.round(BIKE.z*100)/100, h:Math.round(BIKE.h*100)/100, f:BIKE.fixed?1:0, r:rider||null}); }
 function fixBike(){
   if (fixing || BIKE.fixed) return; firstTouch(); move.x = move.y = 0; cam.head = Math.atan2(BIKE.x-cam.x,-(BIKE.z-cam.z));
   fixing = {t:1.6, ok: Math.random()<1/3};
   if (sndOn){ for (let i=0;i<4;i++) tone(520+Math.random()*300,.04,.06,i*.32); }   // 공구 소리
 }
 function endFix(ok){
-  if (ok){ BIKE.fixed = true; toast('🚲 자전거를 탈 수 있게 되었다'); if (sndOn) chime(); }
+  if (ok){ BIKE.fixed = true; pubBike(null); toast('🚲 자전거를 탈 수 있게 되었다'); if (sndOn) chime(); }
   else toast('🔧 고치기 실패');
 }
-function mountBike(){ biking = true; firstTouch(); cam.x = BIKE.x; cam.z = BIKE.z; cam.head = BIKE.h; cam.yaw = BIKE.h; follow = null; }
-function dismountBike(){ biking = false; BIKE.fixed = false; BIKE.x = cam.x; BIKE.z = cam.z; BIKE.h = cam.head; toast('자전거가 다시 고장 나서 쓰러졌다');   // 내리면 다시 고장: 다음에 타려면 또 고쳐야 한다
+function mountBike(){ if (bikeTakenByOther()){ toast('다른 사람이 자전거를 타고 있어요'); return; } biking = true; pubBike(netOn() ? window.MP.id : null); firstTouch(); cam.x = BIKE.x; cam.z = BIKE.z; cam.head = BIKE.h; cam.yaw = BIKE.h; follow = null; }
+function dismountBike(){ biking = false; BIKE.fixed = false; BIKE.x = cam.x; BIKE.z = cam.z; BIKE.h = cam.head; toast('자전거가 다시 고장 나서 쓰러졌다'); pubBike(null);   // 내리면 다시 고장: 다음에 타려면 또 고쳐야 한다
   const r = [Math.cos(cam.head),Math.sin(cam.head)]; cam.x += r[0]*.7; cam.z += r[1]*.7; }
 function prayCairn(){ firstTouch(); cam.head = Math.atan2(CAIRN.x-cam.x,-(CAIRN.z-cam.z)); toast('🙏 두 손 모아 소원을 빌었다'); heartT = performance.now()/1000; if (sndOn) chime(); }
 // 네잎클로버 찾기: 쪼그려 앉아 잠시 뒤적인 뒤, 5번에 1번꼴로 네잎클로버를 찾는다
@@ -2212,7 +2223,7 @@ function frame(now){
   nearQuote = !riding && !petting && !eating && seated<0 && !lying && !resting && $('quote').hidden && Math.hypot(cam.x-(QM.x+QM.f[0]*1.1),cam.z-(QM.z+QM.f[1]*1.1))<2.4;
   nearBoard = !riding && !petting && !eating && seated<0 && !lying && !resting && $('gbook').hidden && Math.abs(cam.x-GB_AT[0])<3 && GB_AT[1]-cam.z<3.4;
   const freeHands = !riding && !biking && !petting && !eating && !searching && !fixing && seated<0 && !lying && !resting;
-  nearBike = freeHands && Math.hypot(cam.x-BIKE.x,cam.z-BIKE.z)<2.4;
+  syncBike(); nearBike = freeHands && !bikeTakenByOther() && Math.hypot(cam.x-BIKE.x,cam.z-BIKE.z)<2.4;
   { const dc = Math.hypot(cam.x-CAIRN.x,cam.z-CAIRN.z); nearCairn = freeHands && dc<2.8;
     if (dc<2.8 && !cairnShown){ cairnShown = true; toast('여기에 기도를 하면 이루어질 것 같다!'); } else if (dc>4) cairnShown = false; }
   if (fixing){ fixing.t -= dt; if (fixing.t<=0){ const ok = fixing.ok; fixing = null; endFix(ok); } }
@@ -2306,7 +2317,7 @@ function frame(now){
     const hu = now-heartT; if (third) drawHearts(gm,cam.x,gy,cam.z,hu); }
   { // 자전거: 타고 있으면 내 밑에, 아니면 세워 둔(또는 쓰러진) 자리에
     if (biking){ const d = Math.hypot(cam.x-(BIKE.lx??cam.x),cam.z-(BIKE.lz??cam.z)); BIKE.ph -= d/.33; drawBike(gm,cam.x,gy,cam.z,cam.head,BIKE.ph,false); }
-    else drawBike(gm,BIKE.x,groundY(BIKE.x,BIKE.z),BIKE.z,BIKE.h,BIKE.ph,!BIKE.fixed);
+    else if (!bikeTakenByOther()) drawBike(gm,BIKE.x,groundY(BIKE.x,BIKE.z),BIKE.z,BIKE.h,BIKE.ph,!BIKE.fixed);
     BIKE.lx = cam.x; BIKE.lz = cam.z; }
   drawBirds(gm,time);
   if (tennisOn && cur.rain<.5) drawTennis(gm,time);
@@ -2455,6 +2466,9 @@ try {
   MP.ntDel = (k,key) => D.update(D.ref(db), {['nkey/'+k]:key, ['notices/'+k]:null});
   MP.gbAdd = (n,m) => D.push(D.ref(db,'guestbook'), {n, m, t:D.serverTimestamp()});
   MP.act = (aid,obj) => D.update(D.ref(db,'world/acts/'+aid), Object.assign({}, obj, {by:id})).catch(failWorld);
+  let jumpRefSet = false;   // 점프(트램펄린 반동 포함) 소식: world/acts/j<내 아이디>에 높이와 시각을 남기고, 나가면 지운다
+  MP.jump = h => { const r = D.ref(db,'world/acts/j'+id); if (!jumpRefSet){ jumpRefSet = true; D.onDisconnect(r).remove(); }
+    D.set(r, {h, t:D.serverTimestamp(), by:id}).catch(failWorld); };
   MP.clearAct = aid => D.remove(D.ref(db,'world/acts/'+aid)).catch(() => {});
   // 내 상태: 0.5초마다, 바뀐 값만 보낸다. 15초마다 살아 있다는 신호만 보낸다
   let last = 0, lastBeat = 0, sent = null;
